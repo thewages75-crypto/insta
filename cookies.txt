@@ -4,9 +4,9 @@
 .instagram.com	TRUE	/	TRUE	1795623906	mid	aPez4QALAAHKAK8nmZmYysG9lZlU
 #HttpOnly_.instagram.com	TRUE	/	TRUE	1803764490	ps_l	1
 #HttpOnly_.instagram.com	TRUE	/	TRUE	1803764490	ps_n	1
-.instagram.com	TRUE	/	TRUE	1774157161	dpr	1.25
-.instagram.com	TRUE	/	TRUE	1808117854	csrftoken	RTEHGazcVeOgVQwifBfKydQ2mwD8boES
-.instagram.com	TRUE	/	TRUE	1781333854	ds_user_id	45575449095
-.instagram.com	TRUE	/	TRUE	1774160221	wd	110x642
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1805127251	sessionid	45575449095%3APTeNL8atjbF3Xs%3A9%3AAYjWjM35d3QJiufDJRL4-UeNK5tXuAkSQEE8u6tnGw
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1773684112	rur	"HIL\05445575449095\0541805133697:01fedf35bd8b2801ceb6c087e9439585531c1160680ffda87437cf6ca1fd7829d3eb097d"
+.instagram.com	TRUE	/	TRUE	1808169517	csrftoken	RTEHGazcVeOgVQwifBfKydQ2mwD8boES
+.instagram.com	TRUE	/	TRUE	1781385517	ds_user_id	45575449095
+#HttpOnly_.instagram.com	TRUE	/	TRUE	1805134257	sessionid	45575449095%3APTeNL8atjbF3Xs%3A9%3AAYhcO7GEH6Z7w-GQ2Ndwv5yduw2AExfS0_YarS6w6g
+.instagram.com	TRUE	/	TRUE	1774214315	dpr	1.25
+.instagram.com	TRUE	/	TRUE	1774214322	wd	1158x730
+#HttpOnly_.instagram.com	TRUE	/	TRUE	1773695977	rur	"HIL\05445575449095\0541805145525:01fe17dc9e1173a5cb21e0e6e1060315df52e49ef9cd4017fad34458c6cb45c05911703d"
