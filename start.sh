@@ -7,4 +7,4 @@ pip install -r requirements.txt
 
 playwright install chromium
 
-python insta.py
+python bot.py
