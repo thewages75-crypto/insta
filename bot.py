@@ -170,6 +170,7 @@ def scrape_background(job, context):
         time.sleep(5)
 
         log(f"Current URL: {page.url}")
+        log(page.content()[:1000])
         if "challenge" in page.url:
             log("Instagram triggered a security challenge. Session is blocked.")
             page.close()
