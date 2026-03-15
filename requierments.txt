@@ -1,9 +1,9 @@
 python-telegram-bot==20.7
+pyTelegramBotAPI
 instaloader
 requests
 pytz
-pyTelegramBotAPI
 playwright
 requests
 Pillow
-telebot
+
