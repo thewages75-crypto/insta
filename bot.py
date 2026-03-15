@@ -29,7 +29,8 @@ job_queue = Queue()
 
 # =========================
 # JOB SYSTEM
-
+import os
+print("Files in project:", os.listdir())
 # =========================
 # LOG FUNCTION
 # =========================
