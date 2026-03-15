@@ -25,7 +25,7 @@ job_queue = Queue()
 # INSTAGRAM SESSION
 # =========================
 
-# IG_SESSIONID = "80454330558%3AgyVmoDRy4c8pBj%3A10%3AAYiQ7rgvA8jCZ_WEFR54X9TEPmj2mRs1s_cM8Mfghg"
+IG_SESSIONID = "44603123622%3A8tr0I8txy4H2XZ%3A0%3AAYirVqJpYExfJvRzqFDTj5nsqeQq-AJbRY3HKUh7AA"
 
 # =========================
 # JOB SYSTEM
@@ -40,30 +40,7 @@ print("Files in project:", os.listdir())
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{t}] {msg}")
-    
-# SESSION FUNCTION
-def load_session_from_cookie():
 
-    with open("cookies.txt", "r") as f:
-
-        for line in f:
-
-            if "sessionid" not in line:
-                continue
-
-            parts = line.strip().split("\t")
-
-            if len(parts) >= 7 and parts[-2] == "sessionid":
-
-                session = parts[-1]
-
-                log(f"Loaded session: {session[:20]}...")
-                return session
-
-    raise Exception("sessionid not found in cookies.txt")
-import os
-print("Files in project:", os.listdir())
-IG_SESSIONID = load_session_from_cookie()
 # =========================
 # INSTALOADER
 # =========================
