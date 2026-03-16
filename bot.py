@@ -184,12 +184,15 @@ def scrape_background(job, context):
 
         log(f"Current URL: {page.url}")
         log("Page title: " + page.title())
+
+        bot.send_message(job.chat_id, f"🌐 Current URL:\n{page.url}")
+        bot.send_message(job.chat_id, f"📄 Page Title:\n{page.title()}")
         
         log(page.content()[:400])
 
-        page.wait_for_selector('a[href*="/p/"], a[href*="/reel/"]', timeout=20000)
+        page.wait_for_selector('header', timeout=20000)
 
-        time.sleep(4)
+        time.sleep(5)
 
         log(f"Current URL: {page.url}")
         # Debug: show first part of HTML
@@ -343,6 +346,7 @@ def start(message):
 class Job:
     def __init__(self, username):
         self.username = username
+        self.chat_id = chat_id
         self.posts = []
         self.sent = 0
         self.running = True
@@ -365,7 +369,7 @@ def profile_handler(message):
         )
         return
 
-    job = Job(username)
+    job = Job(username,message.chat.id)
     user_jobs[message.chat.id] = job
 
     bot.send_message(
