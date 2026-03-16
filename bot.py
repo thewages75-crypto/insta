@@ -180,6 +180,12 @@ def scrape_background(job, context):
 
         page.goto(url, wait_until="domcontentloaded")
 
+        time.sleep(5)
+
+        log(f"Current URL: {page.url}")
+        log("Page title: " + page.title())
+        log(page.content()[:400])
+
         page.wait_for_selector("article", timeout=20000)
 
         time.sleep(4)
