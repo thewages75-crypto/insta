@@ -1,4 +1,4 @@
-#USERNAM TO MEDIA INSTA BOT(with netcookie without other cookie funtion 
+#USERNAM TO MEDIA INSTA BOT(OG)
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from playwright.sync_api import sync_playwright
@@ -25,7 +25,7 @@ job_queue = Queue()
 # INSTAGRAM SESSION
 # =========================
 
-# IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
+IG_SESSIONID = "45575449095%3AUrvTriciDLscrU%3A24%3AAYjo5EPuKQSy89x17AyzjEIfLPuFX9N0n_ZJ4srltA"
 
 # =========================
 # JOB SYSTEM
@@ -34,42 +34,7 @@ job_queue = Queue()
 # LOG FUNCTION
 # =========================
 
-import instaloader
 
-def load_cookies_to_playwright(context, cookie_file="cookies.txt"):
-
-    cookies = []
-
-    with open(cookie_file) as f:
-
-        for line in f:
-
-            if line.startswith("#") and not line.startswith("#HttpOnly_"):
-                continue
-
-            line = line.replace("#HttpOnly_", "")
-            parts = line.strip().split("\t")
-
-            if len(parts) < 7:
-                continue
-
-            domain = parts[0]
-            path = parts[2]
-            secure = parts[3] == "TRUE"
-            expiry = int(parts[4])
-            name = parts[5]
-            value = parts[6]
-
-            cookies.append({
-                "name": name,
-                "value": value,
-                "domain": domain,
-                "path": path,
-                "secure": secure,
-                "expires": expiry
-            })
-
-    context.add_cookies(cookies)
 
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
@@ -81,9 +46,19 @@ print("Files in project:", os.listdir())
 # =========================
 # INSTALOADER
 # =========================
-L = load_instaloader_session("cookies.txt")
-SESSION = L.context._session
 
+L = instaloader.Instaloader(
+    download_pictures=False,
+    download_videos=False,
+    download_video_thumbnails=False,
+    save_metadata=False
+)
+
+L.context._session.cookies.set(
+    "sessionid",
+    IG_SESSIONID,
+    domain=".instagram.com"
+)
 print("Instaloader session active")
 # =========================
 # START PLAYWRIGHT
@@ -166,49 +141,15 @@ def scrape_background(job, context):
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-        html = page.content()
 
-        if "Log in to see photos and videos" in html:
-            log("Instagram login wall detected")
-
-            bot.send_message(
-                job.chat_id,
-                "⚠️ Instagram session logged out or blocked."
-            )
-
-            return
         delay = random.uniform(4,7)
         time.sleep(delay)
 
         page.goto(url, wait_until="domcontentloaded")
 
-        log(f"Current URL: {page.url}")
-        log("Page title: " + page.title())
-
-        # allow React to render
-        time.sleep(6)
-
-        # trigger grid rendering
-        page.evaluate("""
-        window.scrollBy({
-            top: 800,
-            left: 0
-        });
-        """)
-
-        time.sleep(3)
-        bot.send_message(job.chat_id, f"🌐 Current URL:\n{page.url}")
-        bot.send_message(job.chat_id, f"📄 Page Title:\n{page.title()}")
-        
-        log(page.content()[:400])
-
-        page.wait_for_load_state("domcontentloaded")
-        time.sleep(6)
+        time.sleep(5)
 
         log(f"Current URL: {page.url}")
-        # Debug: show first part of HTML
-        log(page.content()[:500])
-        
         if "challenge" in page.url:
             log("Instagram triggered a security challenge. Session is blocked.")
             page.close()
@@ -219,35 +160,20 @@ def scrape_background(job, context):
             page.close()
             return
         # wait until page loads
-        # page.wait_for_load_state("domcontentloaded")
+        page.wait_for_load_state("networkidle")
 
         # small delay for JS rendering
         time.sleep(3)
 
-        # trigger grid rendering
+        # scroll once to trigger posts loading
         page.evaluate("""
         window.scrollBy({
             top: 800,
             left: 0,
-            behavior: 'instant'
+            behavior: 'smooth'
         });
         """)
-
-        time.sleep(2)
-
-        # wait until posts appear
-        page.wait_for_selector('a[href*="/p/"], a[href*="/reel/"]', state="attached", timeout=30000)
-
-        # additional scroll to load more
-        page.evaluate("""
-        window.scrollBy({
-            top: 1200,
-            left: 0,
-            behavior: 'instant'
-        });
-        """)
-
-        time.sleep(random.uniform(3,5))
+        time.sleep(random.uniform(4,6))
 
         for _ in range(20):
 
@@ -255,10 +181,9 @@ def scrape_background(job, context):
                 break
             log("Scanning page for posts...")
             links = page.evaluate("""
-            () => {
-                const anchors = document.querySelectorAll('a[href*="/p/"], a[href*="/reel/"]');
-                return Array.from(anchors).map(a => a.href);
-            }
+                Array.from(document.querySelectorAll('a'))
+                    .map(a => a.href)
+                    .filter(h => h.includes('/p/') || h.includes('/reel/'))
             """)
 
             new_posts = 0
@@ -304,29 +229,24 @@ def playwright_worker():
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-infobars"
+                "--disable-dev-shm-usage"
             ]
         )
 
-        context = browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-            viewport={"width": 1366, "height": 768},
-            device_scale_factor=1,
-            is_mobile=False,
-            has_touch=False,
-        )
-        # load_instaloader_session(context, "cookies.txt")
-        load_cookies_to_playwright(context, "cookies.txt")
+        context = browser.new_context()
+
+        context.add_cookies([{
+            "name": "sessionid",
+            "value": IG_SESSIONID,
+            "domain": ".instagram.com",
+            "path": "/",
+            "httpOnly": True,
+            "secure": True,
+            "sameSite": "None"
+        }])
 
         page = context.new_page()
-        page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
-
-        if page.locator('text="Log in"').count() > 0:
-            log("Instagram session is NOT logged in")
-        else:
-            log("Instagram session is logged in")
-        time.sleep(5)
+        page.goto("https://www.instagram.com/")
 
         log("Instagram session activated")
 
@@ -373,14 +293,13 @@ def start(message):
         "Send Instagram username"
     )
 class Job:
-    def __init__(self, username,chat_id):
+    def __init__(self, username):
         self.username = username
-        self.chat_id = chat_id
         self.posts = []
         self.sent = 0
         self.running = True
 user_jobs ={}
-# job_queue = Queue()
+job_queue = Queue()
 # =========================
 # USERNAME HANDLER
 # =========================
@@ -398,7 +317,7 @@ def profile_handler(message):
         )
         return
 
-    job = Job(username,message.chat.id)
+    job = Job(username)
     user_jobs[message.chat.id] = job
 
     bot.send_message(
