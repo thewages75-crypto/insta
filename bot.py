@@ -41,28 +41,8 @@ def log(msg):
     print(f"[{t}] {msg}")
     
 # SESSION FUNCTION
-# def load_session_from_cookie():
-
-#     with open("cookies.txt", "r") as f:
-
-#         for line in f:
-
-#             if "sessionid" not in line:
-#                 continue
-
-#             parts = line.strip().split("\t")
-
-#             if len(parts) >= 7 and parts[-2] == "sessionid":
-
-#                 session = parts[-1]
-
-#                 log(f"Loaded session: {session[:20]}...")
-#                 return session
-
-#     raise Exception("sessionid not found in cookies.txt")
 import os
 print("Files in project:", os.listdir())
-# IG_SESSIONID = load_session_from_cookie()
 # =========================
 # INSTALOADER
 # =========================
@@ -135,7 +115,18 @@ def get_post_from_url(post_url):
 
     try:
 
-        shortcode = re.search(r"(?:p|reel|tv)/([^/?]+)", post_url).group(1)
+        if "/p/" in post_url:
+            shortcode = post_url.split("/p/")[1].split("/")[0]
+
+        elif "/reel/" in post_url:
+            shortcode = post_url.split("/reel/")[1].split("/")[0]
+
+        elif "/tv/" in post_url:
+            shortcode = post_url.split("/tv/")[1].split("/")[0]
+
+        else:
+            log("Unknown post format")
+            return None
 
         post = instaloader.Post.from_shortcode(
             L.context,
@@ -148,7 +139,6 @@ def get_post_from_url(post_url):
 
         log(f"Instaloader error: {e}")
         return None
-    
 # =========================
 # SCRAPER
 # =========================
@@ -370,8 +360,26 @@ def profile_handler(message):
     job = Job(username)
     user_jobs[message.chat.id] = job
 
-    # start scraper in background
+    bot.send_message(
+        message.chat.id,
+        "Collecting posts from profile....\nPlease wait..."
+    )
+
     job_queue.put(job)
+
+    # wait until scraper collects something
+    wait_time = 0
+    while len(job.posts) == 0 and wait_time < 40:
+        time.sleep(2)
+        wait_time += 2
+
+    if len(job.posts) == 0:
+
+        bot.send_message(
+            message.chat.id,
+            "❌ Failed to collect posts.\nInstagram may have blocked the request."
+        )
+        return
 
     markup = InlineKeyboardMarkup()
 
@@ -382,10 +390,9 @@ def profile_handler(message):
 
     bot.send_message(
         message.chat.id,
-        "Scraping started.\nPress download to receive posts.",
+        f"✅ {len(job.posts)} posts ready.\nPress download.",
         reply_markup=markup
     )
-
 # =========================
 # CANCEL
 # =========================
@@ -426,71 +433,97 @@ def send_next(call):
 
     for post_url in posts:
 
-        log(f"Processing: {post_url}")
+        try:
 
-        post = get_post_from_url(post_url)
+            log(f"Processing: {post_url}")
 
-        if not post:
-            bot.send_message(call.message.chat.id, post_url)
-            continue
+            post = get_post_from_url(post_url)
 
-        medias = extract_media(post)
-
-        for media_type, media_url in medias:
-
-            log(f"Checking post: {post}")
-            log(f"Media type: {media_type}")
-            log(f"Media URL: {media_url}")
-
-            if not media_url:
-                bot.send_message(call.message.chat.id, post)
+            if not post:
+                bot.send_message(call.message.chat.id, f"⚠️ Could not load post\n{post_url}")
                 continue
 
-            media_url = media_url.replace("&amp;", "&")
-            media_url = media_url.replace(".heic", ".jpg")
+            medias = extract_media(post)
 
-            log(f"Final media URL: {media_url}")
+            if not medias:
+                bot.send_message(call.message.chat.id, f"⚠️ No media found\n{post_url}")
+                continue
 
-            try:
+            for media_type, media_url in medias:
 
-                response = requests.get(media_url, timeout=30, stream=True)
+                try:
 
-                if response.status_code != 200:
-                    raise Exception("Media download failed")
+                    log(f"Checking post: {post}")
+                    log(f"Media type: {media_type}")
+                    log(f"Media URL: {media_url}")
 
-                file = BytesIO(response.content)
+                    if not media_url:
+                        bot.send_message(call.message.chat.id, f"⚠️ Empty media URL\n{post_url}")
+                        continue
 
-                if media_type == "video":
+                    media_url = media_url.replace("&amp;", "&")
+                    media_url = media_url.replace(".heic", ".jpg")
 
-                    file.name = "video.mp4"
+                    log(f"Final media URL: {media_url}")
 
-                    bot.send_video(
+                    response = requests.get(media_url, timeout=30, stream=True)
+
+                    if response.status_code != 200:
+                        raise Exception(f"Media download failed (HTTP {response.status_code})")
+
+                    file = BytesIO(response.content)
+
+                    if media_type == "video":
+
+                        file.name = "video.mp4"
+
+                        bot.send_video(
+                            call.message.chat.id,
+                            file,
+                            width=720,
+                            height=1280,
+                            supports_streaming=True
+                        )
+
+                    else:
+
+                        img = Image.open(file).convert("RGB")
+
+                        jpeg = BytesIO()
+                        img.save(jpeg, format="JPEG")
+                        jpeg.seek(0)
+
+                        bot.send_photo(
+                            call.message.chat.id,
+                            jpeg,
+                        )
+
+                    time.sleep(random.uniform(1.5, 3))
+
+                except Exception as e:
+
+                    error_text = str(e)
+
+                    log(f"Media error: {error_text}")
+
+                    bot.send_message(
                         call.message.chat.id,
-                        file,
-                        width=720,
-                        height=1280,
-                        supports_streaming=True
+                        f"❌ Failed to send media\n\nPost:\n{post_url}\n\nReason:\n{error_text}"
                     )
 
-                else:
+        except Exception as e:
 
-                    img = Image.open(file).convert("RGB")
+            error_text = str(e)
 
-                    jpeg = BytesIO()
-                    img.save(jpeg, format="JPEG")
-                    jpeg.seek(0)
+            log(f"Post processing error: {error_text}")
 
-                    bot.send_photo(
-                        call.message.chat.id,
-                        jpeg,
-                    )
-
-            except Exception as e:
-
-                log(f"Telegram error: {e}")
-                bot.send_message(call.message.chat.id, post)
-
+            bot.send_message(
+                call.message.chat.id,
+                f"⚠️ Error processing post\n\nPost:\n{post_url}\n\nReason:\n{error_text}"
+            )
             time.sleep(random.uniform(1.5, 3))
+
+           
 
     job.sent += len(posts)
 
