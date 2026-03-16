@@ -1,4 +1,4 @@
-#USERNAM TO MEDIA INSTA BOT(with netcookie without other cookie funtion
+#USERNAM TO MEDIA INSTA BOT(with netcookie without other cookie funtion 
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from playwright.sync_api import sync_playwright
@@ -90,9 +90,9 @@ print("Files in project:", os.listdir())
 # INSTALOADER
 # =========================
 L = load_instaloader_session("cookies.txt")
-print("Instaloader session active")
-L = load_instaloader_session("cookies.txt")
 SESSION = L.context._session
+
+print("Instaloader session active")
 # =========================
 # START PLAYWRIGHT
 # =========================
@@ -180,7 +180,9 @@ def scrape_background(job, context):
 
         page.goto(url, wait_until="domcontentloaded")
 
-        time.sleep(5)
+        page.wait_for_selector("article", timeout=20000)
+
+        time.sleep(4)
 
         log(f"Current URL: {page.url}")
         if "challenge" in page.url:
@@ -193,7 +195,7 @@ def scrape_background(job, context):
             page.close()
             return
         # wait until page loads
-        page.wait_for_load_state("networkidle")
+        # page.wait_for_load_state("domcontentloaded")
 
         # small delay for JS rendering
         time.sleep(3)
@@ -214,9 +216,10 @@ def scrape_background(job, context):
                 break
             log("Scanning page for posts...")
             links = page.evaluate("""
-                Array.from(document.querySelectorAll('a'))
-                    .map(a => a.href)
-                    .filter(h => h.includes('/p/') || h.includes('/reel/'))
+            () => {
+                const anchors = document.querySelectorAll('article a[href*="/p/"], article a[href*="/reel/"]');
+                return Array.from(anchors).map(a => a.href);
+            }
             """)
 
             new_posts = 0
@@ -269,18 +272,19 @@ def playwright_worker():
         context = browser.new_context()
 
         cookies = []
-
         for cookie in SESSION.cookies:
-
-            if not cookie.domain:
-                continue
-
             cookies.append({
                 "name": cookie.name,
                 "value": cookie.value,
-                "domain": cookie.domain,
-                "path": cookie.path or "/"
+                "domain": ".instagram.com",
+                "path": "/"
             })
+
+        context.add_cookies(cookies)
+
+        page = context.new_page()
+        page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
+        time.sleep(5)
 
         context.add_cookies(cookies)
 
