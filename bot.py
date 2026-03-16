@@ -304,20 +304,25 @@ def playwright_worker():
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
-                "--disable-dev-shm-usage"
+                "--disable-dev-shm-usage",
+                "--disable-infobars"
             ]
         )
 
         context = browser.new_context()
         # load_instaloader_session(context, "cookies.txt")
+        allowed = {"sessionid", "csrftoken", "ds_user_id"}
+
         cookies = []
+
         for cookie in SESSION.cookies:
-            cookies.append({
-                "name": cookie.name,
-                "value": cookie.value,
-                "domain": ".instagram.com",
-                "path": "/"
-            })
+            if cookie.name in allowed:
+                cookies.append({
+                    "name": cookie.name,
+                    "value": cookie.value,
+                    "domain": ".instagram.com",
+                    "path": "/"
+                })
 
         context.add_cookies(cookies)
 
