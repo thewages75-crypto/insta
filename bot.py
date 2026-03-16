@@ -263,6 +263,24 @@ def playwright_worker():
                 log(f"Worker error: {e}")
 
             job_queue.task_done()
+def extract_username(text):
+
+    text = text.strip()
+
+    # remove query parameters
+    text = text.split("?")[0]
+
+    # if full URL
+    match = re.search(r"instagram\.com/([^/]+)/?", text)
+
+    if match:
+        return match.group(1).lower()
+
+    # if just username
+    if re.match(r"^[a-zA-Z0-9._]+$", text):
+        return text.lower()
+
+    return None
 # =========================
 # START COMMAND
 # =========================
@@ -289,7 +307,15 @@ job_queue = Queue()
 @bot.message_handler(func=lambda m: True)
 def profile_handler(message):
 
-    username = message.text.strip().lower()
+    username = extract_username(message.text)
+
+    if not username:
+
+        bot.send_message(
+            message.chat.id,
+            "❌ Invalid input.\n\nSend:\n• Instagram username\n• Instagram profile link"
+        )
+        return
 
     job = Job(username)
     user_jobs[message.chat.id] = job
