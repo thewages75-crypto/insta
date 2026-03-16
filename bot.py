@@ -201,7 +201,7 @@ def scrape_background(job, context):
         
         log(page.content()[:400])
 
-        page.wait_for_selector('header', timeout=20000)
+        page.wait_for_selector('img[alt*="profile picture"]', state="attached", timeout=30000)
 
         time.sleep(5)
 
@@ -224,15 +224,30 @@ def scrape_background(job, context):
         # small delay for JS rendering
         time.sleep(3)
 
-        # scroll once to trigger posts loading
+        # trigger grid rendering
         page.evaluate("""
         window.scrollBy({
             top: 800,
             left: 0,
-            behavior: 'smooth'
+            behavior: 'instant'
         });
         """)
-        time.sleep(random.uniform(4,6))
+
+        time.sleep(2)
+
+        # wait until posts appear
+        page.wait_for_selector('a[href*="/p/"], a[href*="/reel/"]', timeout=30000)
+
+        # additional scroll to load more
+        page.evaluate("""
+        window.scrollBy({
+            top: 1200,
+            left: 0,
+            behavior: 'instant'
+        });
+        """)
+
+        time.sleep(random.uniform(3,5))
 
         for _ in range(20):
 
