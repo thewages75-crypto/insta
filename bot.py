@@ -174,17 +174,6 @@ def scrape_background(job, context):
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-        
-        delay = random.uniform(4,7)
-        time.sleep(delay)
-
-        page.goto(url, wait_until="domcontentloaded")
-
-        time.sleep(5)
-
-        log(f"Current URL: {page.url}")
-        log("Page title: " + page.title())
-        
         html = page.content()
 
         if "Log in to see photos and videos" in html:
@@ -196,14 +185,33 @@ def scrape_background(job, context):
             )
 
             return
+        delay = random.uniform(4,7)
+        time.sleep(delay)
+
+        page.goto(url, wait_until="domcontentloaded")
+
+        log(f"Current URL: {page.url}")
+        log("Page title: " + page.title())
+
+        # allow React to render
+        time.sleep(6)
+
+        # trigger grid rendering
+        page.evaluate("""
+        window.scrollBy({
+            top: 800,
+            left: 0
+        });
+        """)
+
+        time.sleep(3)
         bot.send_message(job.chat_id, f"🌐 Current URL:\n{page.url}")
         bot.send_message(job.chat_id, f"📄 Page Title:\n{page.title()}")
         
         log(page.content()[:400])
 
-        page.wait_for_selector('img[alt*="profile picture"]', state="attached", timeout=30000)
-
-        time.sleep(5)
+        page.wait_for_load_state("domcontentloaded")
+        time.sleep(6)
 
         log(f"Current URL: {page.url}")
         # Debug: show first part of HTML
