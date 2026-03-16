@@ -1,3 +1,4 @@
+#BOT VERTIONN OF CODE
 #USERNAM TO MEDIA INSTA BOT(with netcookie without other cookie funtion 
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -15,6 +16,7 @@ import instaloader
 # =========================
 # BOT TOKEN
 # =========================
+import instaloader
 
 TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
@@ -33,51 +35,29 @@ job_queue = Queue()
 # =========================
 # LOG FUNCTION
 # =========================
-
 import instaloader
+import os
 
-def load_instaloader_session(cookie_file="cookies.txt"):
+USERNAME = "kio41445"
+PASSWORD = "kingofall098"
 
-    L = instaloader.Instaloader(
-        download_pictures=False,
-        download_videos=False,
-        download_video_thumbnails=False,
-        save_metadata=False,
-        quiet=True
-    )
+L = instaloader.Instaloader(
+    download_pictures=False,
+    download_videos=False,
+    download_video_thumbnails=False,
+    save_metadata=False,
+    save_metadata_json=False,
+    quiet=True
+)
 
-    cookies = {}
-
-    with open(cookie_file, "r") as f:
-        for line in f:
-
-            if line.startswith("#") and not line.startswith("#HttpOnly_"):
-                continue
-            
-            line = line.replace("#HttpOnly_", "")
-
-            parts = line.strip().split("\t")
-
-            if len(parts) >= 7:
-                name = parts[5]
-                value = parts[6]
-                cookies[name] = value
-
-    if "sessionid" not in cookies:
-        raise Exception("sessionid not found in cookies.txt")
-
-    for name, value in cookies.items():
-
-        L.context._session.cookies.set(
-            name,
-            value,
-            domain=".instagram.com"
-        )
-
-    print("Instagram cookies loaded")
-
-    return L
-
+try:
+    L.load_session_from_file(USERNAME)
+    print("Instagram session loaded")
+except FileNotFoundError:
+    print("Logging into Instagram...")
+    L.login(USERNAME, PASSWORD)
+    L.save_session_to_file()
+    print("Instagram session saved")
 
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
@@ -89,8 +69,6 @@ print("Files in project:", os.listdir())
 # =========================
 # INSTALOADER
 # =========================
-L = load_instaloader_session("cookies.txt")
-SESSION = L.context._session
 
 print("Instaloader session active")
 # =========================
@@ -103,18 +81,6 @@ def get_profile_posts(username, limit=100):
 
     posts = []
 
-    profile = instaloader.Profile.from_username(
-        L.context,
-        username
-    )
-
-    for post in profile.get_posts():
-
-        posts.append(post)
-
-        if len(posts) >= limit:
-            break
-
     log(f"Collected {len(posts)} posts using Instaloader")
 
     return posts
@@ -122,7 +88,7 @@ def extract_media(post):
 
     items = []
 
-    # carousel
+    # carousela
     if post.typename == "GraphSidecar":
 
         for node in post.get_sidecar_nodes():
@@ -174,6 +140,9 @@ def scrape_background(job, context):
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
+
+        page.goto(url, wait_until="domcontentloaded")
+        time.sleep(4)
         html = page.content()
 
         if "Log in to see photos and videos" in html:
@@ -187,8 +156,6 @@ def scrape_background(job, context):
             return
         delay = random.uniform(4,7)
         time.sleep(delay)
-
-        page.goto(url, wait_until="domcontentloaded")
 
         log(f"Current URL: {page.url}")
         log("Page title: " + page.title())
@@ -324,21 +291,18 @@ def playwright_worker():
             is_mobile=False,
             has_touch=False,
         )
+        if not sessionid:
+            log("Instagram session cookie missing")
         # load_instaloader_session(context, "cookies.txt")
-        allowed = {"sessionid", "csrftoken", "ds_user_id"}
+        sessionid = L.context._session.cookies.get("sessionid")
+        csrftoken = L.context._session.cookies.get("csrftoken")
+        userid = L.context._session.cookies.get("ds_user_id")
 
-        cookies = []
-
-        for cookie in SESSION.cookies:
-            if cookie.name in allowed:
-                cookies.append({
-                    "name": cookie.name,
-                    "value": cookie.value,
-                    "domain": ".instagram.com",
-                    "path": "/"
-                })
-
-        context.add_cookies(cookies)
+        context.add_cookies([
+            {"name": "sessionid", "value": sessionid, "domain": ".instagram.com", "path": "/"},
+            {"name": "csrftoken", "value": csrftoken, "domain": ".instagram.com", "path": "/"},
+            {"name": "ds_user_id", "value": userid, "domain": ".instagram.com", "path": "/"},
+        ])
 
         page = context.new_page()
         page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
@@ -612,3 +576,4 @@ threading.Thread(
 ).start()
 
 bot.infinity_polling()
+
