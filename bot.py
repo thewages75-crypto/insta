@@ -1,4 +1,3 @@
-#BOT VERTIONN OF CODE
 #USERNAM TO MEDIA INSTA BOT(with netcookie without other cookie funtion 
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -16,7 +15,6 @@ import instaloader
 # =========================
 # BOT TOKEN
 # =========================
-import instaloader
 
 TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
@@ -35,33 +33,43 @@ job_queue = Queue()
 # =========================
 # LOG FUNCTION
 # =========================
-import os
 
-USERNAME = "kio41445"
-PASSWORD = "kingofall098"
+import instaloader
 
-L = instaloader.Instaloader(
-    download_pictures=False,
-    download_videos=False,
-    download_video_thumbnails=False,
-    save_metadata=False,
-    quiet=True
-)
-#login to Instagram and save session
-SESSION_FILE = "ig_session"
+def load_cookies_to_playwright(context, cookie_file="cookies.txt"):
 
-try:
-    L.load_session_from_file(USERNAME, SESSION_FILE)
-    print("Instagram session loaded")
+    cookies = []
 
-except FileNotFoundError:
+    with open(cookie_file) as f:
 
-    print("Logging into Instagram...")
-    L.login(USERNAME, PASSWORD)
+        for line in f:
 
-    L.save_session_to_file(SESSION_FILE)
+            if line.startswith("#") and not line.startswith("#HttpOnly_"):
+                continue
 
-    print("Instagram session saved")
+            line = line.replace("#HttpOnly_", "")
+            parts = line.strip().split("\t")
+
+            if len(parts) < 7:
+                continue
+
+            domain = parts[0]
+            path = parts[2]
+            secure = parts[3] == "TRUE"
+            expiry = int(parts[4])
+            name = parts[5]
+            value = parts[6]
+
+            cookies.append({
+                "name": name,
+                "value": value,
+                "domain": domain,
+                "path": path,
+                "secure": secure,
+                "expires": expiry
+            })
+
+    context.add_cookies(cookies)
 
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
@@ -73,6 +81,8 @@ print("Files in project:", os.listdir())
 # =========================
 # INSTALOADER
 # =========================
+L = load_instaloader_session("cookies.txt")
+SESSION = L.context._session
 
 print("Instaloader session active")
 # =========================
@@ -85,6 +95,18 @@ def get_profile_posts(username, limit=100):
 
     posts = []
 
+    profile = instaloader.Profile.from_username(
+        L.context,
+        username
+    )
+
+    for post in profile.get_posts():
+
+        posts.append(post)
+
+        if len(posts) >= limit:
+            break
+
     log(f"Collected {len(posts)} posts using Instaloader")
 
     return posts
@@ -92,7 +114,7 @@ def extract_media(post):
 
     items = []
 
-    # carousela
+    # carousel
     if post.typename == "GraphSidecar":
 
         for node in post.get_sidecar_nodes():
@@ -144,9 +166,6 @@ def scrape_background(job, context):
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-
-        page.goto(url, wait_until="domcontentloaded")
-        time.sleep(4)
         html = page.content()
 
         if "Log in to see photos and videos" in html:
@@ -160,6 +179,8 @@ def scrape_background(job, context):
             return
         delay = random.uniform(4,7)
         time.sleep(delay)
+
+        page.goto(url, wait_until="domcontentloaded")
 
         log(f"Current URL: {page.url}")
         log("Page title: " + page.title())
@@ -295,18 +316,8 @@ def playwright_worker():
             is_mobile=False,
             has_touch=False,
         )
-        if not sessionid:
-            log("Instagram session cookie missing")
         # load_instaloader_session(context, "cookies.txt")
-        sessionid = L.context._session.cookies.get("sessionid")
-        csrftoken = L.context._session.cookies.get("csrftoken")
-        userid = L.context._session.cookies.get("ds_user_id")
-
-        context.add_cookies([
-            {"name": "sessionid", "value": sessionid, "domain": ".instagram.com", "path": "/"},
-            {"name": "csrftoken", "value": csrftoken, "domain": ".instagram.com", "path": "/"},
-            {"name": "ds_user_id", "value": userid, "domain": ".instagram.com", "path": "/"},
-        ])
+        load_cookies_to_playwright(context, "cookies.txt")
 
         page = context.new_page()
         page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
@@ -580,6 +591,3 @@ threading.Thread(
 ).start()
 
 bot.infinity_polling()
-
-
-
