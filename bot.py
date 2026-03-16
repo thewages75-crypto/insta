@@ -20,12 +20,12 @@ TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
 from queue import Queue
 
-job_queue = Queue()
+job_queue = Queue
 # =========================
 # INSTAGRAM SESSION
 # =========================
 
-IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
+# IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
 
 # =========================
 # JOB SYSTEM
@@ -33,7 +33,47 @@ IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j
 # =========================
 # LOG FUNCTION
 # =========================
+import instaloader
 
+def load_instaloader_session(cookie_file="cookies.txt"):
+
+    L = instaloader.Instaloader(
+        download_pictures=False,
+        download_videos=False,
+        download_video_thumbnails=False,
+        save_metadata=False,
+        quiet=True
+    )
+
+    cookies = {}
+
+    with open(cookie_file, "r") as f:
+        for line in f:
+
+            if line.startswith("#"):
+                continue
+
+            parts = line.strip().split("\t")
+
+            if len(parts) >= 7:
+                name = parts[5]
+                value = parts[6]
+                cookies[name] = value
+
+    if "sessionid" not in cookies:
+        raise Exception("sessionid not found in cookies.txt")
+
+    for name, value in cookies.items():
+
+        L.context._session.cookies.set(
+            name,
+            value,
+            domain=".instagram.com"
+        )
+
+    print("Instagram cookies loaded")
+
+    return L
 
 
 def log(msg):
@@ -46,20 +86,10 @@ print("Files in project:", os.listdir())
 # =========================
 # INSTALOADER
 # =========================
-
-L = instaloader.Instaloader(
-    download_pictures=False,
-    download_videos=False,
-    download_video_thumbnails=False,
-    save_metadata=False
-)
-
-L.context._session.cookies.set(
-    "sessionid",
-    IG_SESSIONID,
-    domain=".instagram.com"
-)
+L = load_instaloader_session("cookies.txt")
 print("Instaloader session active")
+L = load_instaloader_session("cookies.txt")
+SESSION = L.context._session
 # =========================
 # START PLAYWRIGHT
 # =========================
@@ -235,15 +265,13 @@ def playwright_worker():
 
         context = browser.new_context()
 
-        context.add_cookies([{
-            "name": "sessionid",
-            "value": IG_SESSIONID,
-            "domain": ".instagram.com",
-            "path": "/",
-            "httpOnly": True,
-            "secure": True,
-            "sameSite": "None"
-        }])
+        for cookie in SESSION.cookies:
+            context.add_cookies([{
+                "name": cookie.name,
+                "value": cookie.value,
+                "domain": cookie.domain,
+                "path": cookie.path
+            }])
 
         page = context.new_page()
         page.goto("https://www.instagram.com/")
@@ -299,7 +327,7 @@ class Job:
         self.sent = 0
         self.running = True
 user_jobs ={}
-job_queue = Queue()
+# job_queue = Queue()
 # =========================
 # USERNAME HANDLER
 # =========================
