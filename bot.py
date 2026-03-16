@@ -135,7 +135,18 @@ def get_post_from_url(post_url):
 
     try:
 
-        shortcode = post_url.split("/p/")[1].split("/")[0]
+        if "/p/" in post_url:
+            shortcode = post_url.split("/p/")[1].split("/")[0]
+
+        elif "/reel/" in post_url:
+            shortcode = post_url.split("/reel/")[1].split("/")[0]
+
+        elif "/tv/" in post_url:
+            shortcode = post_url.split("/tv/")[1].split("/")[0]
+
+        else:
+            log("Unknown post format")
+            return None
 
         post = instaloader.Post.from_shortcode(
             L.context,
