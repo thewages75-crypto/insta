@@ -1,12 +1,1 @@
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1795623903	datr	37P3aBkVj5870OWBZKo0_D0A
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1792599921	ig_did	95C0441D-B9F0-4B13-BF07-B220553F2D7E
-.instagram.com	TRUE	/	TRUE	1792599906	ig_nrcb	1
-.instagram.com	TRUE	/	TRUE	1795623906	mid	aPez4QALAAHKAK8nmZmYysG9lZlU
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1803764490	ps_l	1
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1803764490	ps_n	1
-.instagram.com	TRUE	/	TRUE	1808208839	csrftoken	RTEHGazcVeOgVQwifBfKydQ2mwD8boES
-.instagram.com	TRUE	/	TRUE	1781424839	ds_user_id	45575449095
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1805175840	sessionid	45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q
-.instagram.com	TRUE	/	TRUE	1774253609	dpr	1.25
-.instagram.com	TRUE	/	TRUE	1774253636	wd	1158x678
-#HttpOnly_.instagram.com	TRUE	/	TRUE	1773735241	rur	"VLL\05445575449095\0541805184840:01fef4c5e086049723d7a7b490555b27da83632cb0427b04c5909cd101a841d0671aa2ec"
+45575449095%3AUrvTriciDLscrU%3A24%3AAYjo5EPuKQSy89x17AyzjEIfLPuFX9N0n_ZJ4srltA
