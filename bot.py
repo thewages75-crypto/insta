@@ -184,8 +184,7 @@ def scrape_background(job, context):
 
         log(f"Current URL: {page.url}")
         log("Page title: " + page.title())
-        bot.send_message(call.message.chat.id, f"curent URL :\n{page.url}")
-        bot.send_message(call.message.chat.id, f"Page title :\n{page.title}")
+        
         log(page.content()[:400])
 
         page.wait_for_selector('a[href*="/p/"], a[href*="/reel/"]', timeout=20000)
@@ -296,11 +295,6 @@ def playwright_worker():
         page = context.new_page()
         page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
         time.sleep(5)
-
-        context.add_cookies(cookies)
-
-        page = context.new_page()
-        page.goto("https://www.instagram.com/")
 
         log("Instagram session activated")
 
