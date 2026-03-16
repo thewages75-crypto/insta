@@ -50,8 +50,10 @@ def load_instaloader_session(cookie_file="cookies.txt"):
     with open(cookie_file, "r") as f:
         for line in f:
 
-            if line.startswith("#"):
+            if line.startswith("#") and not line.startswith("#HttpOnly_"):
                 continue
+            
+            line = line.replace("#HttpOnly_", "")
 
             parts = line.strip().split("\t")
 
