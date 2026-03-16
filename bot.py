@@ -1,4 +1,4 @@
-#USERNAM TO MEDIA INSTA BOT(OG)
+#USERNAM TO MEDIA INSTA BOT(with netcookie without other cookie funtion
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from playwright.sync_api import sync_playwright
@@ -33,41 +33,7 @@ job_queue = Queue()
 # =========================
 # LOG FUNCTION
 # =========================
-def load_playwright_cookies(context, cookie_file="cookies.txt"):
 
-    cookies = []
-
-    with open(cookie_file, "r") as f:
-
-        for line in f:
-
-            if line.startswith("#") and not line.startswith("#HttpOnly_"):
-                continue
-
-            line = line.replace("#HttpOnly_", "")
-
-            parts = line.strip().split("\t")
-
-            if len(parts) < 7:
-                continue
-
-            domain = parts[0]
-            path = parts[2]
-            secure = parts[3] == "TRUE"
-            name = parts[5]
-            value = parts[6]
-
-            cookies.append({
-                "name": name,
-                "value": value,
-                "domain": domain,
-                "path": path,
-                "secure": secure
-            })
-
-    context.add_cookies(cookies)
-
-    print("Playwright cookies loaded")
 import instaloader
 
 def load_instaloader_session(cookie_file="cookies.txt"):
@@ -302,7 +268,21 @@ def playwright_worker():
 
         context = browser.new_context()
 
-        load_playwright_cookies(context, "cookies.txt")
+        cookies = []
+
+        for cookie in SESSION.cookies:
+
+            if not cookie.domain:
+                continue
+
+            cookies.append({
+                "name": cookie.name,
+                "value": cookie.value,
+                "domain": cookie.domain,
+                "path": cookie.path or "/"
+            })
+
+        context.add_cookies(cookies)
 
         page = context.new_page()
         page.goto("https://www.instagram.com/")
