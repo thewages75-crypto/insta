@@ -174,7 +174,7 @@ def scrape_background(job, context):
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-        log(page.content()[:500])
+        
         delay = random.uniform(4,7)
         time.sleep(delay)
 
@@ -185,6 +185,9 @@ def scrape_background(job, context):
         time.sleep(4)
 
         log(f"Current URL: {page.url}")
+        # Debug: show first part of HTML
+        log(page.content()[:500])
+        
         if "challenge" in page.url:
             log("Instagram triggered a security challenge. Session is blocked.")
             page.close()
