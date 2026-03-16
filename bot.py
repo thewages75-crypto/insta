@@ -46,7 +46,6 @@ L = instaloader.Instaloader(
     download_videos=False,
     download_video_thumbnails=False,
     save_metadata=False,
-    save_metadata_json=False,
     quiet=True
 )
 
