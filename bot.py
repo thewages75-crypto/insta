@@ -174,7 +174,7 @@ def scrape_background(job, context):
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-
+        log(page.content()[:500])
         delay = random.uniform(4,7)
         time.sleep(delay)
 
@@ -270,7 +270,7 @@ def playwright_worker():
         )
 
         context = browser.new_context()
-
+        load_instaloader_session(context, "cookies.txt")
         cookies = []
         for cookie in SESSION.cookies:
             cookies.append({
