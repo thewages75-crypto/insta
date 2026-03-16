@@ -273,7 +273,7 @@ def playwright_worker():
         )
 
         context = browser.new_context()
-        load_instaloader_session(context, "cookies.txt")
+        # load_instaloader_session(context, "cookies.txt")
         cookies = []
         for cookie in SESSION.cookies:
             cookies.append({
