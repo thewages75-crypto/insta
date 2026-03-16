@@ -184,7 +184,18 @@ def scrape_background(job, context):
 
         log(f"Current URL: {page.url}")
         log("Page title: " + page.title())
+        
+        html = page.content()
 
+        if "Log in to see photos and videos" in html:
+            log("Instagram login wall detected")
+
+            bot.send_message(
+                job.chat_id,
+                "⚠️ Instagram session logged out or blocked."
+            )
+
+            return
         bot.send_message(job.chat_id, f"🌐 Current URL:\n{page.url}")
         bot.send_message(job.chat_id, f"📄 Page Title:\n{page.title()}")
         
@@ -297,6 +308,11 @@ def playwright_worker():
 
         page = context.new_page()
         page.goto("https://www.instagram.com/", wait_until="domcontentloaded")
+
+        if page.locator('text="Log in"').count() > 0:
+            log("Instagram session is NOT logged in")
+        else:
+            log("Instagram session is logged in")
         time.sleep(5)
 
         log("Instagram session activated")
@@ -344,7 +360,7 @@ def start(message):
         "Send Instagram username"
     )
 class Job:
-    def __init__(self, username):
+    def __init__(self, username,chat_id):
         self.username = username
         self.chat_id = chat_id
         self.posts = []
