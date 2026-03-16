@@ -244,7 +244,7 @@ def scrape_background(job, context):
         time.sleep(2)
 
         # wait until posts appear
-        page.wait_for_selector('a[href*="/p/"], a[href*="/reel/"]', timeout=30000)
+        page.wait_for_selector('a[href*="/p/"], a[href*="/reel/"]', state="attached", timeout=30000)
 
         # additional scroll to load more
         page.evaluate("""
@@ -317,7 +317,13 @@ def playwright_worker():
             ]
         )
 
-        context = browser.new_context()
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+            viewport={"width": 1366, "height": 768},
+            device_scale_factor=1,
+            is_mobile=False,
+            has_touch=False,
+        )
         # load_instaloader_session(context, "cookies.txt")
         allowed = {"sessionid", "csrftoken", "ds_user_id"}
 
