@@ -115,18 +115,7 @@ def get_post_from_url(post_url):
 
     try:
 
-        if "/p/" in post_url:
-            shortcode = post_url.split("/p/")[1].split("/")[0]
-
-        elif "/reel/" in post_url:
-            shortcode = post_url.split("/reel/")[1].split("/")[0]
-
-        elif "/tv/" in post_url:
-            shortcode = post_url.split("/tv/")[1].split("/")[0]
-
-        else:
-            log("Unknown post format")
-            return None
+        shortcode = re.search(r"(?:p|reel|tv)/([^/?]+)", post_url).group(1)
 
         post = instaloader.Post.from_shortcode(
             L.context,
@@ -274,61 +263,6 @@ def playwright_worker():
                 log(f"Worker error: {e}")
 
             job_queue.task_done()
-# =========================
-# MEDIA FETCH
-# =========================
-# def fetch_media(post_url):
-
-#     try:
-
-#         headers = {
-#             "User-Agent": "Mozilla/5.0",
-#             "Accept-Language": "en-US,en;q=0.9"
-#         }
-
-#         r = requests.get(post_url, headers=headers, timeout=15)
-#         html = r.text
-
-#         items = []
-
-#         # Extract JSON block
-#         data_match = re.search(r'window\._sharedData = (.*?);</script>', html)
-
-#         if not data_match:
-#             return items
-
-#         data = json.loads(data_match.group(1))
-
-#         media = data["entry_data"]["PostPage"][0]["graphql"]["shortcode_media"]
-
-#         # VIDEO
-#         if media["is_video"]:
-#             items.append(("video", media["video_url"]))
-
-#         # SINGLE IMAGE
-#         elif "display_url" in media:
-#             items.append(("photo", media["display_url"]))
-
-#         # CAROUSEL
-#         if "edge_sidecar_to_children" in media:
-
-#             edges = media["edge_sidecar_to_children"]["edges"]
-
-#             for edge in edges:
-
-#                 node = edge["node"]
-
-#                 if node["is_video"]:
-#                     items.append(("video", node["video_url"]))
-#                 else:
-#                     items.append(("photo", node["display_url"]))
-
-#         return items
-
-#     except Exception as e:
-
-#         log(f"Media error: {e}")
-#         return []
 # =========================
 # START COMMAND
 # =========================
