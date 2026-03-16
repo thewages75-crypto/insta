@@ -35,7 +35,6 @@ job_queue = Queue()
 # =========================
 # LOG FUNCTION
 # =========================
-import instaloader
 import os
 
 USERNAME = "kio41445"
@@ -48,14 +47,20 @@ L = instaloader.Instaloader(
     save_metadata=False,
     quiet=True
 )
+#login to Instagram and save session
+SESSION_FILE = "ig_session"
 
 try:
-    L.load_session_from_file(USERNAME)
+    L.load_session_from_file(USERNAME, SESSION_FILE)
     print("Instagram session loaded")
+
 except FileNotFoundError:
+
     print("Logging into Instagram...")
     L.login(USERNAME, PASSWORD)
-    L.save_session_to_file()
+
+    L.save_session_to_file(SESSION_FILE)
+
     print("Instagram session saved")
 
 def log(msg):
@@ -575,4 +580,6 @@ threading.Thread(
 ).start()
 
 bot.infinity_polling()
+
+
 
