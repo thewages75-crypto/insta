@@ -16,6 +16,7 @@ import instaloader
 # BOT TOKEN
 # =========================
 FAIL_COUNT = {}
+ADMIN_ID = 123455
 TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
 from queue import Queue
@@ -26,7 +27,7 @@ job_queue = Queue()
 # =========================
 LAST_SESSION_CHECK = 0
 SESSION_CHECK_INTERVAL = 300
-IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%Qqnq2YL5l2j5od0mbvk8b74Q"
+IG_SESSIONID = "45575449095%3APTeNL8atjcs9SbBQqnq2YL5l2j5od0mbvk8b74Q"
 CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}   # chat_id → True/False
 control_queue = Queue()
@@ -367,9 +368,17 @@ def extract_username(text):
 @bot.message_handler(commands=["start"])
 def start(message):
 
+    markup = InlineKeyboardMarkup()
+
+    if message.chat.id == ADMIN_ID:
+        markup.add(
+            InlineKeyboardButton("🔍 Check Session", callback_data="check_session")
+        )
+
     bot.send_message(
         message.chat.id,
-        "Send Instagram username"
+        "Send Instagram username",
+        reply_markup=markup
     )
 class Job:
     def __init__(self, username):
@@ -498,11 +507,19 @@ def profile_handler(message):
     # =========================
     # STEP 7: SUCCESS
     # =========================
+    
     markup = InlineKeyboardMarkup()
+
     markup.add(
         InlineKeyboardButton("Download 10 Posts", callback_data="next"),
         InlineKeyboardButton("Cancel", callback_data="cancel")
     )
+
+    # 🔴 ADD HERE
+    if chat_id == ADMIN_ID:
+        markup.add(
+            InlineKeyboardButton("🔍 Check Session", callback_data="check_session")
+        )
 
     bot.send_message(
         chat_id,
@@ -522,7 +539,35 @@ def cancel(call):
         job.running = False
 
     bot.send_message(call.message.chat.id,"Scraping stopped.")
+#=======================
+#CHECK SESSION
+#=======================
+@bot.callback_query_handler(func=lambda call: call.data == "check_session")
+def check_session(call):
 
+    chat_id = call.message.chat.id
+
+    # 🔴 only admin allowed
+    if chat_id != ADMIN_ID:
+        bot.answer_callback_query(call.id, "Not allowed")
+        return
+
+    # 🔴 check session
+    valid = is_session_valid(CURRENT_SESSION)
+
+    status = "✅ VALID" if valid else "❌ INVALID"
+
+    # 🔒 mask session
+    session = CURRENT_SESSION
+    masked = session[:6] + "..." + session[-6:] if len(session) > 12 else session
+
+    bot.send_message(
+        chat_id,
+        f"🔐 Session Status: {status}\n\nSession:\n{masked}"
+    )
+    if not valid:
+        WAITING_SESSION[chat_id] = True
+        bot.send_message(chat_id, "❌ Session expired. Send new sessionid.")
 # =========================
 # SEND POSTS
 # =========================
