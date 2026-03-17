@@ -135,7 +135,18 @@ def get_post_from_url(post_url):
 def scrape_background(job, context):
     username = job.username
     log(f"Scraping started for {username}")
+    try:
+        insta_posts = get_profile_posts(username, limit=100)
 
+        for p in insta_posts:
+            link = f"https://www.instagram.com/p/{p.shortcode}/"
+            if link not in job.posts:
+                job.posts.append(link)
+
+        log(f"Instaloader added {len(insta_posts)} posts")
+
+    except Exception as e:
+        log(f"Instaloader fallback error: {e}")
     try:
 
         page = context.new_page()
@@ -218,7 +229,6 @@ def scrape_background(job, context):
 
         except Exception as e:
             log(f"Profile extraction error: {e}")
-        log(f"Current URL: {page.url}")
         # GET PAGE TITLE + URL
         page_title = page.title()
         current_url = page.url
@@ -408,17 +418,18 @@ def profile_handler(message):
 
     # wait until scraper collects something
     wait_time = 0
-    while len(job.posts) == 0 and wait_time < 40:
-        time.sleep(2)
-        wait_time += 2
+    # show button immediately
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton("Download 10 Posts", callback_data="next"),
+        InlineKeyboardButton("Cancel", callback_data="cancel")
+    )
 
-    if len(job.posts) == 0:
-
-        bot.send_message(
-            message.chat.id,
-            "❌ Failed to collect posts.\nInstagram may have blocked the request."
-        )
-        return
+    bot.send_message(
+        message.chat.id,
+        "📥 Posts are being collected in background.\nClick download when ready.",
+        reply_markup=markup
+    )
 
     markup = InlineKeyboardMarkup()
 
@@ -463,9 +474,12 @@ def send_next(call):
     posts = job.posts[start:end]
     bot.send_message(call.message.chat.id, "Downloading media...")
 
-    # if not posts:
-    #     bot.send_message(call.message.chat.id, "Still collecting posts...")
-    #     return
+    if not posts:
+        bot.send_message(
+            call.message.chat.id,
+            "⏳ Posts are still loading...\nPlease wait a few seconds and try again."
+        )
+        return
 
     from io import BytesIO
     from PIL import Image
