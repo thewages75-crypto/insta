@@ -26,7 +26,7 @@ job_queue = Queue()
 # =========================
 LAST_SESSION_CHECK = 0
 SESSION_CHECK_INTERVAL = 300
-IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%BqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
+IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%Qqnq2YL5l2j5od0mbvk8b74Q"
 CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}   # chat_id → True/False
 control_queue = Queue()
@@ -210,9 +210,25 @@ def scrape_background(job, context):
             return
 
         if "accounts/login" in page.url:
-            log("Session expired. Instagram requires login.")
+
+            log("❌ Not logged in → updating session and retrying...")
+
+            # 🔥 update session
+            update_playwright_session(context)
+
             page.close()
-            return
+
+            # 🔥 retry immediately
+            page = context.new_page()
+            page.goto(url, wait_until="domcontentloaded")
+            time.sleep(5)
+
+            log(f"Retry URL: {page.url}")
+
+            if "login" in page.url:
+                log("❌ Session still invalid after retry")
+                page.close()
+                return
         # wait until page loads
         page.wait_for_load_state("networkidle")
 
