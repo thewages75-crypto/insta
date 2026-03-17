@@ -15,91 +15,31 @@ import instaloader
 # =========================
 # BOT TOKEN
 # =========================
-DEBUG_MESSAGES = {}
+
 TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
 from queue import Queue
 
 job_queue = Queue()
-DEBUG = True
-ADMIN_ID = 8305774350  # put your Telegram ID
 # =========================
 # INSTAGRAM SESSION
 # =========================
-control_queue = Queue()
-PLAYWRIGHT_CONTEXT = None
-IG_SESSIONID = "45575449095%3AUrvTriciDLscrU%3A24%3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
-CURRENT_SESSION = IG_SESSIONID
-WAITING_SESSION = {}
-LAST_SESSION_CHECK = 0
-SESSION_CHECK_INTERVAL = 300  # 5 minutes
+
+IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
 
 # =========================
 # JOB SYSTEM
-import os
-import sys
 
-def restart_bot():
-    log("🔄 Restarting bot process...")
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
-
-def is_session_valid(sessionid):
-    try:
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-        }
-
-        cookies = {
-            "sessionid": sessionid
-        }
-
-        r = requests.get(
-            "https://www.instagram.com/",
-            headers=headers,
-            cookies=cookies,
-            timeout=10,
-            allow_redirects=False  # 🔥 IMPORTANT
-        )
-        # if redirected to login → invalid
-        if r.status_code in [301, 302]:
-            return False
-
-        if r.status_code != 200:
-            return False
-
-        return True
-
-    except Exception as e:
-        log(f"Session check error: {e}")
-        return False
 # =========================
 # LOG FUNCTION
 # =========================
+
+
+
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{t}] {msg}")
-def debug(chat_id, text):
-
-    if not DEBUG or not chat_id:
-        return
-
-    try:
-        # edit if exists
-        if chat_id in DEBUG_MESSAGES:
-            bot.edit_message_text(
-                text,
-                chat_id,
-                DEBUG_MESSAGES[chat_id]
-            )
-            return
-
-        # otherwise send new
-        msg = bot.send_message(chat_id, text)
-        DEBUG_MESSAGES[chat_id] = msg.message_id
-
-    except Exception as e:
-        print(f"Debug error: {e}")
+    
 # SESSION FUNCTION
 import os
 print("Files in project:", os.listdir())
@@ -114,34 +54,16 @@ L = instaloader.Instaloader(
     save_metadata=False
 )
 
-if not is_session_valid(IG_SESSIONID):
-    print("❌ Developer session is INVALID")
-else:
-    print("✅ Developer session is VALID")
-
 L.context._session.cookies.set(
     "sessionid",
     IG_SESSIONID,
     domain=".instagram.com"
 )
+print("Instaloader session active")
 # =========================
 # START PLAYWRIGHT
 # =========================
-def update_playwright_session(context):
-    if context is None:
-        log("no context found")
-        return
 
-    context.clear_cookies()
-    context.add_cookies([{
-        "name": "sessionid",
-        "value": CURRENT_SESSION,
-        "domain": ".instagram.com",
-        "path": "/",
-        "httpOnly": True,
-        "secure": True,
-        "sameSite": "None"
-    }])
 print("Starting browser...")
 
 def get_profile_posts(username, limit=100):
@@ -213,38 +135,113 @@ def get_post_from_url(post_url):
 def scrape_background(job, context):
     username = job.username
     log(f"Scraping started for {username}")
-    job.status = "opening_page"
-    debug(job.chat_id, f"[{job.username}] Opening page")
-
-    
 
     try:
 
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-        
+
         delay = random.uniform(4,7)
         time.sleep(delay)
 
         page.goto(url, wait_until="domcontentloaded")
 
         time.sleep(5)
-        job.status = "loaded_page"
+        try:
+            page.wait_for_selector("header", timeout=10000)
+
+            # PAGE INFO
+            page_title = page.title()
+            current_url = page.url
+
+            # USERNAME (from URL fallback)
+            username = job.username
+
+            # FULL NAME
+            try:
+                full_name = page.locator("header h1").inner_text()
+            except:
+                full_name = "N/A"
+
+            # BIO
+            try:
+                bio = page.locator("header section div.-vDIg span").inner_text()
+            except:
+                try:
+                    bio = page.locator("header div._aa_c span").inner_text()
+                except:
+                    bio = "N/A"
+
+            # POSTS / FOLLOWERS / FOLLOWING
+            try:
+                stats = page.locator("header ul li").all_inner_texts()
+                posts = stats[0]
+                followers = stats[1]
+                following = stats[2]
+            except:
+                posts = followers = following = "N/A"
+
+            # PROFILE PIC
+            try:
+                profile_pic = page.locator("header img").first.get_attribute("src")
+            except:
+                profile_pic = None
+
+            # LOG
+            log(f"Profile: {username}")
+            log(f"Followers: {followers}")
+
+            # SEND TEXT INFO
+            bot.send_message(
+                job.chat_id,
+                f"👤 Profile Info\n\n"
+                f"📛 Username: {username}\n"
+                f"📝 Name: {full_name}\n\n"
+                f"📊 Posts: {posts}\n"
+                f"👥 Followers: {followers}\n"
+                f"➡️ Following: {following}\n\n"
+                f"📄 Bio: {bio}\n\n"
+                f"🔗 URL: {current_url}\n"
+                f"🧾 Title: {page_title}"
+            )
+
+            # SEND PROFILE PIC
+            if profile_pic:
+                try:
+                    response = requests.get(profile_pic, timeout=15)
+                    if response.status_code == 200:
+                        bot.send_photo(job.chat_id, response.content)
+                except Exception as e:
+                    log(f"DP send error: {e}")
+
+        except Exception as e:
+            log(f"Profile extraction error: {e}")
         log(f"Current URL: {page.url}")
-        title = page.title()
-        log(f"page title : {title}")
-        bot.send_message(job.chat_id,f"🌐 Page Title:\n{page.title}")
-        bot.send_message(job.chat_id,f"🔗 Current URL:\n{page.url}")
+        # GET PAGE TITLE + URL
+        page_title = page.title()
+        current_url = page.url
+
+        log(f"Page Title: {page_title}")
+        log(f"Current URL: {current_url}")
+
+        # SEND TO USER
+        try:
+            bot.send_message(
+                job.chat_id,
+                f"📄 Page Info:\n\n"
+                f"🔗 URL: {current_url}\n"
+                f"📝 Title: {page_title}"
+            )
+        except Exception as e:
+            log(f"Failed to send page info: {e}")
         if "challenge" in page.url:
-            job.status = "challenge"
-            debug(job.chat_id, f"[{job.username}]Instagram triggered a security challenge. Session is blocked.")
+            log("Instagram triggered a security challenge. Session is blocked.")
             page.close()
             return
 
         if "accounts/login" in page.url:
-            job.status = "session_expired"
-            debug(job.chat_id, f"[{job.username}]Session expired. Instagram requires login.")
+            log("Session expired. Instagram requires login.")
             page.close()
             return
         # wait until page loads
@@ -267,7 +264,7 @@ def scrape_background(job, context):
 
             if not job.running:
                 break
-            # log("Scanning page for posts...")
+            log("Scanning page for posts...")
             links = page.evaluate("""
                 Array.from(document.querySelectorAll('a'))
                     .map(a => a.href)
@@ -283,9 +280,7 @@ def scrape_background(job, context):
                     job.posts.append(link)
                     new_posts += 1
 
-            if new_posts > 0:
-                debug(job.chat_id, f"[{job.username}] posts: {len(job.posts)} (+{new_posts})")
-            log(f"posts: {len(job.posts)} (+{new_posts})")
+            log(f"Collected posts: {len(job.posts)} (+{new_posts})")
 
             page.evaluate("""
             window.scrollBy({
@@ -309,7 +304,7 @@ def scrape_background(job, context):
             pass
 
 def playwright_worker():
-    global PLAYWRIGHT_CONTEXT
+
     log("Starting browser in worker thread...")
 
     with sync_playwright() as play:
@@ -324,27 +319,24 @@ def playwright_worker():
         )
 
         context = browser.new_context()
-        PLAYWRIGHT_CONTEXT = context
-        update_playwright_session(context)
+
+        context.add_cookies([{
+            "name": "sessionid",
+            "value": IG_SESSIONID,
+            "domain": ".instagram.com",
+            "path": "/",
+            "httpOnly": True,
+            "secure": True,
+            "sameSite": "None"
+        }])
 
         page = context.new_page()
         page.goto("https://www.instagram.com/")
 
         log("Instagram session activated")
+
         while True:
 
-            # 🔴 handle control commands FIRST
-            while not control_queue.empty():
-
-                cmd = control_queue.get()
-
-                if cmd == "update_session":
-                    log("🔄 Updating session in Playwright thread")
-                    update_playwright_session(context)
-
-                control_queue.task_done()
-
-            # 🔴 then handle jobs
             job = job_queue.get()
 
             if job is None:
@@ -392,142 +384,51 @@ class Job:
         self.posts = []
         self.sent = 0
         self.running = True
-        self.status = "created"
 user_jobs ={}
 job_queue = Queue()
 # =========================
 # USERNAME HANDLER
 # =========================
-FAIL_COUNT = 0
+
 @bot.message_handler(func=lambda m: True)
 def profile_handler(message):
 
-    global CURRENT_SESSION, LAST_SESSION_CHECK
-
-    # =========================
-    # STEP 1: HANDLE SESSION INPUT
-    # =========================
-    if WAITING_SESSION.get(message.chat.id):
-
-        new_session = message.text.strip()
-
-        if is_session_valid(new_session):
-
-            CURRENT_SESSION = new_session
-
-            # update instaloader
-            L.context._session.cookies.set(
-                "sessionid",
-                CURRENT_SESSION,
-                domain=".instagram.com"
-            )
-
-            # update playwright
-            control_queue.put("update_session")
-
-            WAITING_SESSION[message.chat.id] = False
-
-            bot.send_message(message.chat.id, "✅ Session updated successfully!")
-
-        else:
-            bot.send_message(message.chat.id, "❌ Invalid session. Send again.")
-            return
-
-        return  # IMPORTANT: stop here
-
-    # =========================
-    # STEP 2: CHECK SESSION (with cooldown)
-    # =========================
-    current_time = time.time()
-
-    if current_time - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
-
-        LAST_SESSION_CHECK = current_time
-
-        if not is_session_valid(CURRENT_SESSION):
-
-            WAITING_SESSION[message.chat.id] = True
-
-            bot.send_message(
-                message.chat.id,
-                "❌ Session expired.\nSend new sessionid."
-            )
-            return
-
-    # =========================
-    # STEP 3: NORMAL USER INPUT
-    # =========================
     username = extract_username(message.text)
 
     if not username:
+
         bot.send_message(
             message.chat.id,
-            "❌ Invalid input.\n\nSend username or profile link."
+            "❌ Invalid input.\n\nSend:\n• Instagram username\n• Instagram profile link"
         )
         return
 
-    # =========================
-    # STEP 4: START JOB
-    # =========================
     job = Job(username, message.chat.id)
     user_jobs[message.chat.id] = job
 
     bot.send_message(
         message.chat.id,
-        "Collecting posts...\nPlease wait..."
+        "Collecting posts from profile....\nPlease wait..."
     )
 
     job_queue.put(job)
 
+    # wait until scraper collects something
     wait_time = 0
     while len(job.posts) == 0 and wait_time < 40:
         time.sleep(2)
         wait_time += 2
 
-    # =========================
-    # STEP 5: FAILURE HANDLING
-    # =========================
-    
     if len(job.posts) == 0:
-        global FAIL_COUNT
-        FAIL_COUNT += 1
 
-        if FAIL_COUNT >= 1:
-            bot.send_message(
-                message.chat.id,
-                "⚠️ Critical error. Restarting bot..."
-            )
+        bot.send_message(
+            message.chat.id,
+            "❌ Failed to collect posts.\nInstagram may have blocked the request."
+        )
+        return
 
-        time.sleep(2)
-
-        restart_bot()
-    else:
-        # check session FIRST
-        if not is_session_valid(CURRENT_SESSION):
-
-            WAITING_SESSION[message.chat.id] = True
-
-            bot.send_message(
-                message.chat.id,
-                "❌ Session expired.\nSend new sessionid."
-            )
-            return
-
-        # otherwise restart system
-        # bot.send_message(
-        #     message.chat.id,
-        #     "⚠️ System error. Restarting bot..."
-        # )
-
-        # time.sleep(2)
-        
-        # restart_bot()
-        # return
-
-    # =========================
-    # STEP 6: SUCCESS
-    # =========================
     markup = InlineKeyboardMarkup()
+
     markup.add(
         InlineKeyboardButton("Download 10 Posts", callback_data="next"),
         InlineKeyboardButton("Cancel", callback_data="cancel")
@@ -535,7 +436,7 @@ def profile_handler(message):
 
     bot.send_message(
         message.chat.id,
-        f"✅ {len(job.posts)} posts ready.",
+        f"✅ {len(job.posts)} posts ready.\nPress download.",
         reply_markup=markup
     )
 # =========================
