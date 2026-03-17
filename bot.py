@@ -205,6 +205,7 @@ def scrape_background(job, context):
                 f"🔗 URL: {current_url}\n"
                 f"🧾 Title: {page_title}"
             )
+            bot.send_message(job.chat_id, "📡 Fetching posts...")
 
             # SEND PROFILE PIC
             if profile_pic:
@@ -224,17 +225,7 @@ def scrape_background(job, context):
 
         log(f"Page Title: {page_title}")
         log(f"Current URL: {current_url}")
-
-        # SEND TO USER
-        try:
-            bot.send_message(
-                job.chat_id,
-                f"📄 Page Info:\n\n"
-                f"🔗 URL: {current_url}\n"
-                f"📝 Title: {page_title}"
-            )
-        except Exception as e:
-            log(f"Failed to send page info: {e}")
+        
         if "challenge" in page.url:
             log("Instagram triggered a security challenge. Session is blocked.")
             page.close()
@@ -408,7 +399,9 @@ def profile_handler(message):
 
     bot.send_message(
         message.chat.id,
-        "Collecting posts from profile....\nPlease wait..."
+        "👤 Profile loaded successfully!\n\n"
+        "📥 Now collecting posts...\n"
+        "⏳ Please wait, download button will appear shortly."
     )
 
     job_queue.put(job)
