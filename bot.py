@@ -15,60 +15,37 @@ import instaloader
 # =========================
 # BOT TOKEN
 # =========================
-DEBUG_MESSAGES = {}
+FAIL_COUNT = {}
 TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
 from queue import Queue
 
 job_queue = Queue()
-DEBUG = True
-ADMIN_ID = 8305774350  # put your Telegram ID
 # =========================
 # INSTAGRAM SESSION
 # =========================
-control_queue = Queue()
-PLAYWRIGHT_CONTEXT = None
-IG_SESSIONID = "45575449095%3AUrvTriciDLscrU%3A24%3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
-CURRENT_SESSION = IG_SESSIONID
-WAITING_SESSION = {}
 LAST_SESSION_CHECK = 0
-SESSION_CHECK_INTERVAL = 300  # 5 minutes
-
+SESSION_CHECK_INTERVAL = 300
+IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
+CURRENT_SESSION = IG_SESSIONID
+WAITING_SESSION = {}   # chat_id → True/False
 # =========================
 # JOB SYSTEM
-import os
-import sys
-
-def restart_bot():
-    log("🔄 Restarting bot process...")
-    python = sys.executable
-    os.execl(python, python, *sys.argv)
-
 def is_session_valid(sessionid):
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-        }
-
-        cookies = {
-            "sessionid": sessionid
-        }
-
         r = requests.get(
-            "https://www.instagram.com/",
-            headers=headers,
-            cookies=cookies,
+            "https://www.instagram.com/accounts/edit/",
+            cookies={"sessionid": sessionid},
+            headers={"User-Agent": "Mozilla/5.0"},
             timeout=10,
-            allow_redirects=False  # 🔥 IMPORTANT
+            allow_redirects=False
         )
-        # if redirected to login → invalid
-        if r.status_code in [301, 302]:
-            return False
 
-        if r.status_code != 200:
-            return False
+        # logged-in users can access /accounts/edit/
+        if r.status_code == 200:
+            return True
 
-        return True
+        return False
 
     except Exception as e:
         log(f"Session check error: {e}")
@@ -76,30 +53,13 @@ def is_session_valid(sessionid):
 # =========================
 # LOG FUNCTION
 # =========================
+
+
+
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{t}] {msg}")
-def debug(chat_id, text):
-
-    if not DEBUG or not chat_id:
-        return
-
-    try:
-        # edit if exists
-        if chat_id in DEBUG_MESSAGES:
-            bot.edit_message_text(
-                text,
-                chat_id,
-                DEBUG_MESSAGES[chat_id]
-            )
-            return
-
-        # otherwise send new
-        msg = bot.send_message(chat_id, text)
-        DEBUG_MESSAGES[chat_id] = msg.message_id
-
-    except Exception as e:
-        print(f"Debug error: {e}")
+    
 # SESSION FUNCTION
 import os
 print("Files in project:", os.listdir())
@@ -114,34 +74,31 @@ L = instaloader.Instaloader(
     save_metadata=False
 )
 
-if not is_session_valid(IG_SESSIONID):
-    print("❌ Developer session is INVALID")
-else:
-    print("✅ Developer session is VALID")
-
 L.context._session.cookies.set(
     "sessionid",
     IG_SESSIONID,
     domain=".instagram.com"
 )
+print("Instaloader session active")
+import os
+import sys
+
+def restart_bot(chat_id=None):
+    try:
+        if chat_id:
+            bot.send_message(chat_id, "🔄 Restarting bot... Please wait.")
+    except:
+        pass
+
+    log("🔄 Restarting process now...")
+
+    time.sleep(2)
+
+    os.execv(sys.executable, ['python'] + sys.argv)
 # =========================
 # START PLAYWRIGHT
 # =========================
-def update_playwright_session(context):
-    if context is None:
-        log("no context found")
-        return
 
-    context.clear_cookies()
-    context.add_cookies([{
-        "name": "sessionid",
-        "value": CURRENT_SESSION,
-        "domain": ".instagram.com",
-        "path": "/",
-        "httpOnly": True,
-        "secure": True,
-        "sameSite": "None"
-    }])
 print("Starting browser...")
 
 def get_profile_posts(username, limit=100):
@@ -213,42 +170,28 @@ def get_post_from_url(post_url):
 def scrape_background(job, context):
     username = job.username
     log(f"Scraping started for {username}")
-    job.status = "opening_page"
-    debug(job.chat_id, f"[{job.username}] Opening page")
-
-    
 
     try:
 
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-        
+
         delay = random.uniform(4,7)
         time.sleep(delay)
 
         page.goto(url, wait_until="domcontentloaded")
 
         time.sleep(5)
-        job.status = "loaded_page"
+
         log(f"Current URL: {page.url}")
-        title = page.title()
-        log(f"page title : {title}")
-        title = page.title()
-        try:
-            bot.send_message(job.chat_id, f"🌐 Page Title:\n{title}")
-            bot.send_message(job.chat_id, f"🔗 Current URL:\n{page.url}")
-        except Exception as e:
-            log(f"Telegram error: {e}")
         if "challenge" in page.url:
-            job.status = "challenge"
-            debug(job.chat_id, f"[{job.username}]Instagram triggered a security challenge. Session is blocked.")
+            log("Instagram triggered a security challenge. Session is blocked.")
             page.close()
             return
 
         if "accounts/login" in page.url:
-            job.status = "session_expired"
-            debug(job.chat_id, f"[{job.username}]Session expired. Instagram requires login.")
+            log("Session expired. Instagram requires login.")
             page.close()
             return
         # wait until page loads
@@ -267,24 +210,11 @@ def scrape_background(job, context):
         """)
         time.sleep(random.uniform(4,6))
 
-        max_scrolls = 50
-        last_count = 0
-        same_count_times = 0
-
-        for i in range(max_scrolls):
+        for _ in range(20):
 
             if not job.running:
                 break
-
-            # 🔹 human-like random scroll
-            scroll_amount = random.randint(800, 1600)
-
-            page.mouse.wheel(0, scroll_amount)
-
-            # 🔹 random pause (very important)
-            time.sleep(random.uniform(2.5, 5.5))
-
-            # 🔹 collect posts
+            log("Scanning page for posts...")
             links = page.evaluate("""
                 Array.from(document.querySelectorAll('a'))
                     .map(a => a.href)
@@ -300,24 +230,17 @@ def scrape_background(job, context):
                     job.posts.append(link)
                     new_posts += 1
 
-            # 🔹 debug only when new posts appear
-            if new_posts > 0:
-                debug(job.chat_id, f"[{job.username}] posts: {len(job.posts)} (+{new_posts})")
+            log(f"Collected posts: {len(job.posts)} (+{new_posts})")
 
-            log(f"posts: {len(job.posts)} (+{new_posts})")
+            page.evaluate("""
+            window.scrollBy({
+                top: 1200,
+                left: 0,
+                behavior: 'smooth'
+            });
+            """)
 
-            # 🔴 STOP CONDITION (VERY IMPORTANT)
-            if len(job.posts) == last_count:
-                same_count_times += 1
-            else:
-                same_count_times = 0
-
-            last_count = len(job.posts)
-
-            # 🔥 if no new posts for 3 scrolls → STOP
-            if same_count_times >= 3:
-                log("No new posts loading → stopping scroll")
-                break
+            time.sleep(3)
 
         page.close()
 
@@ -325,13 +248,13 @@ def scrape_background(job, context):
         log(f"Scraper error: {e}")
 
     finally:
-        job.finished = True   # ✅ IMPORTANT
         try:
             page.close()
         except:
             pass
+
 def playwright_worker():
-    global PLAYWRIGHT_CONTEXT
+
     log("Starting browser in worker thread...")
 
     with sync_playwright() as play:
@@ -346,27 +269,24 @@ def playwright_worker():
         )
 
         context = browser.new_context()
-        PLAYWRIGHT_CONTEXT = context
-        update_playwright_session(context)
+
+        context.add_cookies([{
+            "name": "sessionid",
+            "value": CURRENT_SESSION,
+            "domain": ".instagram.com",
+            "path": "/",
+            "httpOnly": True,
+            "secure": True,
+            "sameSite": "None"
+        }])
 
         page = context.new_page()
         page.goto("https://www.instagram.com/")
 
         log("Instagram session activated")
+
         while True:
 
-            # 🔴 handle control commands FIRST
-            while not control_queue.empty():
-
-                cmd = control_queue.get()
-
-                if cmd == "update_session":
-                    log("🔄 Updating session in Playwright thread")
-                    update_playwright_session(context)
-
-                control_queue.task_done()
-
-            # 🔴 then handle jobs
             job = job_queue.get()
 
             if job is None:
@@ -408,147 +328,131 @@ def start(message):
         "Send Instagram username"
     )
 class Job:
-    def __init__(self, username, chat_id):
+    def __init__(self, username):
         self.username = username
-        self.chat_id = chat_id
         self.posts = []
         self.sent = 0
         self.running = True
-        self.status = "created"
-        self.finished = False   # ✅ ADD THIS
 user_jobs ={}
 job_queue = Queue()
 # =========================
 # USERNAME HANDLER
 # =========================
-FAIL_COUNT = 0
+
 @bot.message_handler(func=lambda m: True)
 def profile_handler(message):
 
-    global CURRENT_SESSION, LAST_SESSION_CHECK
+    chat_id = message.chat.id
 
     # =========================
     # STEP 1: HANDLE SESSION INPUT
     # =========================
-    if WAITING_SESSION.get(message.chat.id):
+    if WAITING_SESSION.get(chat_id):
 
         new_session = message.text.strip()
 
         if is_session_valid(new_session):
 
+            global CURRENT_SESSION
             CURRENT_SESSION = new_session
 
-            # update instaloader
             L.context._session.cookies.set(
                 "sessionid",
                 CURRENT_SESSION,
                 domain=".instagram.com"
             )
 
-            # update playwright
-            control_queue.put("update_session")
+            WAITING_SESSION[chat_id] = False
 
-            WAITING_SESSION[message.chat.id] = False
-
-            bot.send_message(message.chat.id, "✅ Session updated successfully!")
+            bot.send_message(chat_id, "✅ Session updated successfully!")
 
         else:
-            bot.send_message(message.chat.id, "❌ Invalid session. Send again.")
+            bot.send_message(chat_id, "❌ Invalid session.\nSend again.")
             return
 
-        return  # IMPORTANT: stop here
+        return
 
     # =========================
-    # STEP 2: CHECK SESSION (with cooldown)
+    # STEP 2: CHECK SESSION FIRST
     # =========================
-    current_time = time.time()
+    global LAST_SESSION_CHECK
 
-    if current_time - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
+    now = time.time()
 
-        LAST_SESSION_CHECK = current_time
+    if now - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
+        LAST_SESSION_CHECK = now
 
         if not is_session_valid(CURRENT_SESSION):
 
-            WAITING_SESSION[message.chat.id] = True
+            WAITING_SESSION[chat_id] = True
 
             bot.send_message(
-                message.chat.id,
-                "❌ Session expired.\nSend new sessionid."
+                chat_id,
+                "❌ Session expired.\n\nSend new sessionid."
             )
             return
 
     # =========================
-    # STEP 3: NORMAL USER INPUT
+    # STEP 3: NORMAL INPUT
     # =========================
     username = extract_username(message.text)
 
     if not username:
-        bot.send_message(
-            message.chat.id,
-            "❌ Invalid input.\n\nSend username or profile link."
-        )
+        bot.send_message(chat_id, "❌ Invalid input")
         return
 
     # =========================
-    # STEP 4: START JOB
+    # STEP 4: FAIL COUNT INIT
     # =========================
-    job = Job(username, message.chat.id)
-    user_jobs[message.chat.id] = job
+    if chat_id not in FAIL_COUNT:
+        FAIL_COUNT[chat_id] = 0
+
+    # =========================
+    # STEP 5: START JOB
+    # =========================
+    job = Job(username)
+    user_jobs[chat_id] = job
 
     bot.send_message(
-        message.chat.id,
+        chat_id,
         "Collecting posts...\nPlease wait..."
     )
 
     job_queue.put(job)
 
+    # wait for posts
     wait_time = 0
-    while not job.finished and wait_time < 60:
+    while len(job.posts) == 0 and wait_time < 40:
         time.sleep(2)
         wait_time += 2
 
     # =========================
-    # STEP 5: FAILURE HANDLING
+    # STEP 6: FAILURE HANDLING
     # =========================
-    
     if len(job.posts) == 0:
-        global FAIL_COUNT
-        FAIL_COUNT += 1
 
-        if FAIL_COUNT >= 2:
+        FAIL_COUNT[chat_id] += 1
+
+        if FAIL_COUNT[chat_id] < 2:
             bot.send_message(
-                message.chat.id,
-                "⚠️ Critical error. Restarting bot..."
+                chat_id,
+                "⚠️ Failed to collect posts.\nRetrying..."
             )
 
-        time.sleep(2)
-
-        restart_bot()
-    else:
-        # check session FIRST
-        if not is_session_valid(CURRENT_SESSION):
-
-            WAITING_SESSION[message.chat.id] = True
-
-            bot.send_message(
-                message.chat.id,
-                "❌ Session expired.\nSend new sessionid."
-            )
+            job_queue.put(job)
             return
 
-        # otherwise restart system
-        # bot.send_message(
-        #     message.chat.id,
-        #     "⚠️ System error. Restarting bot..."
-        # )
+        else:
+            bot.send_message(
+                chat_id,
+                "❌ Failed multiple times.\n🔄 Restarting bot..."
+            )
 
-        # time.sleep(2)
-        
-        # restart_bot()
-        # return
+            restart_bot(chat_id)
+            return
 
     # =========================
-    # STEP 6: SUCCESS
+    # STEP 7: SUCCESS
     # =========================
     markup = InlineKeyboardMarkup()
     markup.add(
@@ -557,7 +461,7 @@ def profile_handler(message):
     )
 
     bot.send_message(
-        message.chat.id,
+        chat_id,
         f"✅ {len(job.posts)} posts ready.",
         reply_markup=markup
     )
