@@ -35,11 +35,8 @@ control_queue = Queue()
 # JOB SYSTEM
 def progress_updater(job, chat_id):
 
-    # 🔥 send initial message ONCE
-    msg = bot.send_message(chat_id, "📊 Collected posts: 0")
-    job.progress_msg_id = msg.message_id
-
-    last_count = 0
+    last_count = -1
+    last_msg_id = None
 
     while job.running:
 
@@ -53,16 +50,21 @@ def progress_updater(job, chat_id):
 
                 text = f"📊 Collected posts: {current}"
 
-                bot.edit_message_text(
-                    text,
-                    chat_id,
-                    job.progress_msg_id
-                )
+                # 🔥 delete old message
+                if last_msg_id:
+                    try:
+                        bot.delete_message(chat_id, last_msg_id)
+                    except:
+                        pass
+
+                # 🔥 send new message
+                msg = bot.send_message(chat_id, text)
+                last_msg_id = msg.message_id
 
         except Exception as e:
             log(f"Progress error: {e}")
 
-        time.sleep(5)   
+        time.sleep(3)
 def is_session_valid(sessionid):
     try:
         r = requests.get(
