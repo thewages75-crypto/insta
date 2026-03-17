@@ -81,25 +81,25 @@ def log(msg):
     print(f"[{t}] {msg}")
 def debug(chat_id, text):
 
-    if not DEBUG:
+    if not DEBUG or not chat_id:
         return
 
-    # if message already exists → edit it
-    if chat_id in DEBUG_MESSAGES:
-        try:
+    try:
+        # edit if exists
+        if chat_id in DEBUG_MESSAGES:
             bot.edit_message_text(
                 text,
                 chat_id,
                 DEBUG_MESSAGES[chat_id]
             )
             return
-        except:
-            pass
 
-    # otherwise send new
-    msg = bot.send_message(chat_id, text)
-    DEBUG_MESSAGES[chat_id] = msg.message_id
-    
+        # otherwise send new
+        msg = bot.send_message(chat_id, text)
+        DEBUG_MESSAGES[chat_id] = msg.message_id
+
+    except Exception as e:
+        print(f"Debug error: {e}")
 # SESSION FUNCTION
 import os
 print("Files in project:", os.listdir())
@@ -214,7 +214,7 @@ def scrape_background(job, context):
     username = job.username
     log(f"Scraping started for {username}")
     job.status = "opening_page"
-    debug(f"[{job.username}] Opening page", True)
+    debug(f"[{job.chat_id}] Opening page", True)
 
     
 
@@ -232,18 +232,18 @@ def scrape_background(job, context):
         time.sleep(5)
         job.status = "loaded_page"
         log(f"Current URL: {page.url}")
-        log(f"page title : {page.title}")
-        bot.send_message(job.chat_id,f"🌐 Page Title:\n{page.title}")
+        log(f"page title : {page.title()}")
+        bot.send_message(job.chat_id,f"🌐 Page Title:\n{page.title()}")
         bot.send_message(job.chat_id,f"🔗 Current URL:\n{page.url}")
         if "challenge" in page.url:
-            job.stauts = "challenge"
-            debug(f"[{job.username}]Instagram triggered a security challenge. Session is blocked.")
+            job.status = "challenge"
+            debug(f"[{job.chat_id}]Instagram triggered a security challenge. Session is blocked.")
             page.close()
             return
 
         if "accounts/login" in page.url:
             job.stauts = "session_expierd"
-            debug(f"[{job.usernamae}]Session expired. Instagram requires login.")
+            debug(f"[{job.chat_id}]Session expired. Instagram requires login.")
             page.close()
             return
         # wait until page loads
@@ -282,7 +282,7 @@ def scrape_background(job, context):
                     job.posts.append(link)
                     new_posts += 1
 
-            debug(f"[{job.user}] posts: {len(job.posts)} (+{new_posts})")
+            debug(f"[{job.chat_id}] posts: {len(job.posts)} (+{new_posts})")
             log(f"posts: {len(job.posts)} (+{new_posts})")
 
             page.evaluate("""
@@ -487,7 +487,7 @@ def profile_handler(message):
     # =========================
     
     if len(job.posts) == 0:
-        FAIL_COUNT +=1
+        global FAIL_COUNT 
         if FAIL_COUNT >=1:
             bot.send_message(
                 message.chat.id,
