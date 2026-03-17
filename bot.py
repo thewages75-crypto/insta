@@ -24,18 +24,44 @@ job_queue = Queue()
 # =========================
 # INSTAGRAM SESSION
 # =========================
-
+PLAYWRIGHT_CONTEXT = None
 IG_SESSIONID = "45575449095%3AUrvTriciDLscrU%3A24%3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
-
+CURRENT_SESSION = IG_SESSIONID
+WAITING_SESSION = {}
+LAST_SESSION_CHECK = 0
+SESSION_CHECK_INTERVAL = 300  # 5 minutes
 # =========================
 # JOB SYSTEM
 
 # =========================
 # LOG FUNCTION
 # =========================
+def is_session_valid(sessionid):
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+        }
 
+        cookies = {
+            "sessionid": sessionid
+        }
 
+        r = requests.get(
+            "https://www.instagram.com/",
+            headers=headers,
+            cookies=cookies,
+            timeout=10
+        )
 
+        # if redirected to login → invalid
+        if "login" in r.url or r.status_code != 200:
+            return False
+
+        return True
+
+    except Exception as e:
+        log(f"Session check error: {e}")
+        return False
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
     print(f"[{t}] {msg}")
@@ -54,16 +80,34 @@ L = instaloader.Instaloader(
     save_metadata=False
 )
 
+if not is_session_valid(IG_SESSIONID):
+    print("❌ Developer session is INVALID")
+else:
+    print("✅ Developer session is VALID")
+
 L.context._session.cookies.set(
     "sessionid",
     IG_SESSIONID,
     domain=".instagram.com"
 )
-print("Instaloader session active")
 # =========================
 # START PLAYWRIGHT
 # =========================
+def update_playwright_session(context):
+    if context is None:
+        log("no context found")
+        return
 
+    context.clear_cookies()
+    context.add_cookies([{
+        "name": "sessionid",
+        "value": CURRENT_SESSION,
+        "domain": ".instagram.com",
+        "path": "/",
+        "httpOnly": True,
+        "secure": True,
+        "sameSite": "None"
+    }])
 print("Starting browser...")
 
 def get_profile_posts(username, limit=100):
@@ -219,7 +263,7 @@ def scrape_background(job, context):
             pass
 
 def playwright_worker():
-
+    global PLAYWRIGHT_CONTEXT
     log("Starting browser in worker thread...")
 
     with sync_playwright() as play:
@@ -234,16 +278,8 @@ def playwright_worker():
         )
 
         context = browser.new_context()
-
-        context.add_cookies([{
-            "name": "sessionid",
-            "value": IG_SESSIONID,
-            "domain": ".instagram.com",
-            "path": "/",
-            "httpOnly": True,
-            "secure": True,
-            "sameSite": "None"
-        }])
+        PLAYWRIGHT_CONTEXT = context
+        update_playwright_session(context)
 
         page = context.new_page()
         page.goto("https://www.instagram.com/")
@@ -307,8 +343,49 @@ job_queue = Queue()
 @bot.message_handler(func=lambda m: True)
 def profile_handler(message):
 
-    username = extract_username(message.text)
+    global CURRENT_SESSION
+    global LAST_SESSION_CHECK
 
+    if not WAITING_SESSION.get(message.chat.id):
+
+        current_time = time.time()
+
+        if current_time - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
+
+            LAST_SESSION_CHECK = current_time
+
+            if not is_session_valid(CURRENT_SESSION):
+
+                WAITING_SESSION[message.chat.id] = True
+
+                bot.send_message(
+                    message.chat.id,
+                    "❌ Session expired.\nSend new sessionid."
+                )
+                return
+    # 🔴 check current session before proceeding
+    if WAITING_SESSION.get(message.chat.id):
+        pass
+    else:
+        # only check once per request
+        global LAST_SESSION_CHECK
+
+        current_time = time.time()
+
+        if current_time - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
+
+            LAST_SESSION_CHECK = current_time
+
+            if not is_session_valid(CURRENT_SESSION):
+
+                WAITING_SESSION[message.chat.id] = True
+
+                bot.send_message(
+                    message.chat.id,
+                    "❌ Session expired.\nSend new sessionid."
+                )
+                return
+    username = extract_username(message.text)
     if not username:
 
         bot.send_message(
