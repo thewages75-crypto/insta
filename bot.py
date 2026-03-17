@@ -16,7 +16,7 @@ import instaloader
 # BOT TOKEN
 # =========================
 
-TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
+TOKEN = "8608796288:AAG9DfM_iVuA2fQLZExC1GU1akgbp_md8kM"
 bot = telebot.TeleBot(TOKEN, threaded=True)
 from queue import Queue
 
