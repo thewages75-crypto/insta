@@ -35,7 +35,11 @@ control_queue = Queue()
 # JOB SYSTEM
 def progress_updater(job, chat_id):
 
-    last_count = -1   # 🔥 put here (outside loop)
+    # 🔥 send initial message ONCE
+    msg = bot.send_message(chat_id, "📊 Collected posts: 0")
+    job.progress_msg_id = msg.message_id
+
+    last_count = 0
 
     while job.running:
 
@@ -49,20 +53,16 @@ def progress_updater(job, chat_id):
 
                 text = f"📊 Collected posts: {current}"
 
-                if job.progress_msg_id:
-                    bot.edit_message_text(
-                        text,
-                        chat_id,
-                        job.progress_msg_id
-                    )
-                else:
-                    msg = bot.send_message(chat_id, text)
-                    job.progress_msg_id = msg.message_id
+                bot.edit_message_text(
+                    text,
+                    chat_id,
+                    job.progress_msg_id
+                )
 
         except Exception as e:
             log(f"Progress error: {e}")
 
-        time.sleep(10)
+        time.sleep(5)   
 def is_session_valid(sessionid):
     try:
         r = requests.get(
@@ -255,7 +255,7 @@ def scrape_background(job, context):
 
             # 🔥 retry immediately
             page = context.new_page()
-            page.goto(url, wait_until="domcontentloaded")
+            # page.goto(url, wait_until="domcontentloaded")
             time.sleep(5)
 
             log(f"Retry URL: {page.url}")
@@ -310,13 +310,7 @@ def scrape_background(job, context):
 
             log(f"Collected posts: {len(job.posts)} (+{new_posts})")
 
-            page.evaluate("""
-            window.scrollBy({
-                top: 1200,
-                left: 0,
-                behavior: 'smooth'
-            });
-            """)
+            page.mouse.wheel(0, 3000)
 
             time.sleep(3)
 
@@ -554,7 +548,7 @@ def profile_handler(message):
     # =========================
     # STEP 7: SUCCESS
     # =========================
-    job.running = False
+    
     markup = InlineKeyboardMarkup()
 
     markup.add(
@@ -573,6 +567,7 @@ def profile_handler(message):
         f"✅ {len(job.posts)} posts ready. click download button to download now",
         reply_markup=markup
     )
+    job.running = False
 # =========================
 # CANCEL
 # =========================
