@@ -22,7 +22,7 @@ from queue import Queue
 
 job_queue = Queue()
 DEBUG = True
-ADMIN_ID = 123456789  # put your Telegram ID
+ADMIN_ID = 8305774350  # put your Telegram ID
 # =========================
 # INSTAGRAM SESSION
 # =========================
@@ -33,6 +33,7 @@ CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}
 LAST_SESSION_CHECK = 0
 SESSION_CHECK_INTERVAL = 300  # 5 minutes
+global FAIL_COUNT
 # =========================
 # JOB SYSTEM
 import os
@@ -42,9 +43,7 @@ def restart_bot():
     log("🔄 Restarting bot process...")
     python = sys.executable
     os.execl(python, python, *sys.argv)
-# =========================
-# LOG FUNCTION
-# =========================
+
 def is_session_valid(sessionid):
     try:
         headers = {
@@ -74,7 +73,13 @@ def is_session_valid(sessionid):
     except Exception as e:
         log(f"Session check error: {e}")
         return False
-def log(chat_id, text):
+# =========================
+# LOG FUNCTION
+# =========================
+def log(msg):
+    t = datetime.datetime.now().strftime("%H:%M:%S")
+    print(f"[{t}] {msg}")
+def debug(chat_id, text):
 
     if not DEBUG:
         return
@@ -209,36 +214,36 @@ def scrape_background(job, context):
     username = job.username
     log(f"Scraping started for {username}")
     job.status = "opening_page"
-    log(f"[{job.username}] Opening page", True)
+    debug(f"[{job.username}] Opening page", True)
 
-    page.goto(url, wait_until="domcontentloaded")
-
-    job.status = "loaded_page"
-    log(f"[{job.username}] Page loaded: {page.url}", True)
+    
 
     try:
 
         page = context.new_page()
 
         url = f"https://www.instagram.com/{username}/"
-
+        
         delay = random.uniform(4,7)
         time.sleep(delay)
 
         page.goto(url, wait_until="domcontentloaded")
 
         time.sleep(5)
-
+        job.status = "loaded_page"
         log(f"Current URL: {page.url}")
+        log(f"page title : {page.title}")
+        bot.send_message(job.chat_id,f"🌐 Page Title:\n{page.title}")
+        bot.send_message(job.chat_id,f"🔗 Current URL:\n{page.url}")
         if "challenge" in page.url:
             job.stauts = "challenge"
-            log(f"[{job.username}]Instagram triggered a security challenge. Session is blocked.")
+            debug(f"[{job.username}]Instagram triggered a security challenge. Session is blocked.")
             page.close()
             return
 
         if "accounts/login" in page.url:
             job.stauts = "session_expierd"
-            log(f"[{job.usernmae}]Session expired. Instagram requires login.")
+            debug(f"[{job.usernamae}]Session expired. Instagram requires login.")
             page.close()
             return
         # wait until page loads
@@ -277,7 +282,8 @@ def scrape_background(job, context):
                     job.posts.append(link)
                     new_posts += 1
 
-            log(f"Collected posts: {len(job.posts)} (+{new_posts})")
+            debug(f"[{job.user}] posts: {len(job.posts)} (+{new_posts})")
+            log(f"posts: {len(job.posts)} (+{new_posts})")
 
             page.evaluate("""
             window.scrollBy({
@@ -461,7 +467,7 @@ def profile_handler(message):
     # =========================
     # STEP 4: START JOB
     # =========================
-    job = Job(username)
+    job = Job(username, message.chat_id)
     user_jobs[message.chat.id] = job
 
     bot.send_message(
