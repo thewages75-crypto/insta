@@ -56,27 +56,27 @@ def progress_updater(job, chat_id):
         log(f"Pin error: {e}")
     
 
-    last_count = None
+    last_count = -1
+
+    last_text = ""
 
     while job.running:
 
-        try:
-            current = len(job.posts)
+        current = len(job.posts)
+        text = f"📊 Collected posts: {current}\n⏱ Updating..."
 
-            if current != last_count:
+        if text != last_text:
+            last_text = text
 
-                last_count = current
-
-                text = f"📊 Collected posts: {current}\n⏱ Updating..."
-
+            try:
                 bot.edit_message_text(
                     text,
                     chat_id,
                     job.progress_msg_id
                 )
-
-        except Exception as e:
-            log(f"Progress error: {e}")
+            except Exception as e:
+                if "message is not modified" not in str(e):
+                    log(f"Edit error: {e}")
 
         time.sleep(3)
 def is_session_valid(sessionid):
@@ -565,7 +565,8 @@ def profile_handler(message):
     # STEP 7: SUCCESS
     # =========================
 
-     
+    # 🔴 STOP updater FIRST
+    job.running = False  
 
     # 🔴 UPDATE PROGRESS MESSAGE (final state)
     try:
@@ -576,8 +577,6 @@ def profile_handler(message):
         )
     except:
         pass
-    # 🔴 STOP updater FIRST
-    job.running = False 
 
     # 🔴 CREATE BUTTONS
     markup = InlineKeyboardMarkup()
