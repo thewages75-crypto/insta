@@ -35,31 +35,45 @@ control_queue = Queue()
 # JOB SYSTEM
 def progress_updater(job, chat_id):
 
+    try:
+        # 🔥 send ONE message
+        msg = bot.send_message(
+            chat_id,
+            "📊 Collected posts: 0\n⏱ Updating..."
+        )
+
+        job.progress_msg_id = msg.message_id
+    except Exception as e:
+        log(f"Progress init error: {e}")
+        return
+    try:
+        bot.pin_chat_message(
+            chat_id,
+            msg.message_id,
+            disable_notification=True
+        )
+    except Exception as e:
+        log(f"Pin error: {e}")
+    
+
     last_count = -1
-    last_msg_id = None
 
     while job.running:
 
         try:
             current = len(job.posts)
 
-            # 🔴 only update if changed
             if current != last_count:
 
                 last_count = current
 
-                text = f"📊 Collected posts: {current}"
+                text = f"📊 Collected posts: {current}\n⏱ Updating..."
 
-                # 🔥 delete old message
-                if last_msg_id:
-                    try:
-                        bot.delete_message(chat_id, last_msg_id)
-                    except:
-                        pass
-
-                # 🔥 send new message
-                msg = bot.send_message(chat_id, text)
-                last_msg_id = msg.message_id
+                bot.edit_message_text(
+                    text,
+                    chat_id,
+                    job.progress_msg_id
+                )
 
         except Exception as e:
             log(f"Progress error: {e}")
@@ -550,12 +564,32 @@ def profile_handler(message):
     # =========================
     # STEP 7: SUCCESS
     # =========================
-    
-    markup = InlineKeyboardMarkup()
 
+    # 🔴 STOP updater FIRST
+    job.running = False  
+
+    # 🔴 UPDATE PROGRESS MESSAGE (final state)
+    try:
+        bot.edit_message_text(
+            f"✅ Done!\n📊 Total posts: {len(job.posts)}",
+            chat_id,
+            job.progress_msg_id
+        )
+    except:
+        pass
+
+    # 🔴 CREATE BUTTONS
+    markup = InlineKeyboardMarkup()
     markup.add(
         InlineKeyboardButton("Download 10 Posts", callback_data="next"),
         InlineKeyboardButton("Cancel", callback_data="cancel")
+    )
+
+    # 🔴 SEND FINAL MESSAGE
+    bot.send_message(
+        chat_id,
+        f"✅ {len(job.posts)} posts ready.\nClick download button.",
+        reply_markup=markup
     )
 
     # 🔴 ADD HERE
@@ -569,7 +603,7 @@ def profile_handler(message):
         f"✅ {len(job.posts)} posts ready. click download button to download now",
         reply_markup=markup
     )
-    job.running = False
+    # job.running = False
 # =========================
 # CANCEL
 # =========================
