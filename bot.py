@@ -1,4 +1,4 @@
-#USERNAM TO MEDIA INSTA BOT(OG)
+#USERNAM TO MEDIA INSTA BOT
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from playwright.sync_api import sync_playwright
