@@ -35,45 +35,31 @@ control_queue = Queue()
 # JOB SYSTEM
 def progress_updater(job, chat_id):
 
-    try:
-        # 🔥 send ONE message
-        msg = bot.send_message(
-            chat_id,
-            "📊 Collected posts: 0\n⏱ Updating..."
-        )
-
-        job.progress_msg_id = msg.message_id
-    except Exception as e:
-        log(f"Progress init error: {e}")
-        return
-    try:
-        bot.pin_chat_message(
-            chat_id,
-            msg.message_id,
-            disable_notification=True
-        )
-    except Exception as e:
-        log(f"Pin error: {e}")
-    
-
     last_count = -1
+    last_msg_id = None
 
     while job.running:
 
         try:
             current = len(job.posts)
 
+            # 🔴 only update if changed
             if current != last_count:
 
                 last_count = current
 
-                text = f"📊 Collected posts: {current}\n⏱ Updating..."
+                text = f"📊 Collected posts: {current}"
 
-                bot.edit_message_text(
-                    text,
-                    chat_id,
-                    job.progress_msg_id
-                )
+                # 🔥 delete old message
+                if last_msg_id:
+                    try:
+                        bot.delete_message(chat_id, last_msg_id)
+                    except:
+                        pass
+
+                # 🔥 send new message
+                msg = bot.send_message(chat_id, text)
+                last_msg_id = msg.message_id
 
         except Exception as e:
             log(f"Progress error: {e}")
