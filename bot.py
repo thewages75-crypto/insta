@@ -26,9 +26,10 @@ job_queue = Queue()
 # =========================
 LAST_SESSION_CHECK = 0
 SESSION_CHECK_INTERVAL = 300
-IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
+IG_SESSIONID = "45575449095%3APTeNL8atjbF3Xs%3A9%BqHG1ebl1Qqnq2YL5l2j5od0mbvk8b74Q"
 CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}   # chat_id → True/False
+control_queue = Queue()
 # =========================
 # JOB SYSTEM
 def is_session_valid(sessionid):
@@ -50,6 +51,24 @@ def is_session_valid(sessionid):
     except Exception as e:
         log(f"Session check error: {e}")
         return False
+def update_playwright_session(context):
+    try:
+        context.clear_cookies()
+
+        context.add_cookies([{
+            "name": "sessionid",
+            "value": CURRENT_SESSION,
+            "domain": ".instagram.com",
+            "path": "/",
+            "httpOnly": True,
+            "secure": True,
+            "sameSite": "None"
+        }])
+
+        log("✅ Playwright session updated")
+
+    except Exception as e:
+        log(f"Session update error: {e}")
 # =========================
 # LOG FUNCTION
 # =========================
@@ -270,15 +289,8 @@ def playwright_worker():
 
         context = browser.new_context()
 
-        context.add_cookies([{
-            "name": "sessionid",
-            "value": CURRENT_SESSION,
-            "domain": ".instagram.com",
-            "path": "/",
-            "httpOnly": True,
-            "secure": True,
-            "sameSite": "None"
-        }])
+        # 🔴 initial session
+        update_playwright_session(context)
 
         page = context.new_page()
         page.goto("https://www.instagram.com/")
@@ -287,6 +299,22 @@ def playwright_worker():
 
         while True:
 
+            # =========================
+            # 🔴 STEP 1: HANDLE CONTROL COMMANDS
+            # =========================
+            while not control_queue.empty():
+
+                cmd = control_queue.get()
+
+                if cmd == "update_session":
+                    log("🔄 Updating Playwright session...")
+                    update_playwright_session(context)
+
+                control_queue.task_done()
+
+            # =========================
+            # 🔴 STEP 2: HANDLE JOBS
+            # =========================
             job = job_queue.get()
 
             if job is None:
@@ -361,7 +389,7 @@ def profile_handler(message):
                 CURRENT_SESSION,
                 domain=".instagram.com"
             )
-
+            control_queue.put("update_session")
             WAITING_SESSION[chat_id] = False
 
             bot.send_message(chat_id, "✅ Session updated successfully!")
