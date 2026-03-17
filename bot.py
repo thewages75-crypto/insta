@@ -41,7 +41,6 @@ def is_session_valid(sessionid):
     try:
         headers = {
             "User-Agent": "Mozilla/5.0",
-            "X-IG-App-ID": "936619743392459",  # important
         }
 
         cookies = {
@@ -49,16 +48,20 @@ def is_session_valid(sessionid):
         }
 
         r = requests.get(
-            "https://i.instagram.com/api/v1/accounts/current_user/?",
+            "https://www.instagram.com/",
             headers=headers,
             cookies=cookies,
-            timeout=10
+            timeout=10,
+            allow_redirects=False  # 🔥 IMPORTANT
         )
+        # if redirected to login → invalid
+        if r.status_code in [301, 302]:
+            return False
 
-        if r.status_code == 200 and "user" in r.text:
-            return True
+        if r.status_code != 200:
+            return False
 
-        return False
+        return True
 
     except Exception as e:
         log(f"Session check error: {e}")
@@ -288,8 +291,8 @@ def playwright_worker():
         log("Instagram session activated")
         while True:
 
-            # 🔴 check for control commands first
-            if not control_queue.empty():
+            # 🔴 handle control commands FIRST
+            while not control_queue.empty():
 
                 cmd = control_queue.get()
 
@@ -299,9 +302,7 @@ def playwright_worker():
 
                 control_queue.task_done()
 
-            job = job_queue.get()
-        while True:
-
+            # 🔴 then handle jobs
             job = job_queue.get()
 
             if job is None:
