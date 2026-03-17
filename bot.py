@@ -16,7 +16,7 @@ import instaloader
 # BOT TOKEN
 # =========================
 FAIL_COUNT = {}
-ADMIN_ID = 123455
+ADMIN_ID = 8305774350
 TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
 from queue import Queue
