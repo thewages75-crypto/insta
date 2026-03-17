@@ -26,31 +26,36 @@ job_queue = Queue()
 # =========================
 
 IG_SESSIONID = "45575449095%3AUrvTriciDLscrU%3A24%3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
-
+CURRENT_SESSION = IG_SESSIONID
+WAITING_SESSION = {}
 # =========================
-# PROFILE INFO FUNTION
-def get_profile_info(username):
-    try:
-        profile = instaloader.Profile.from_username(L.context, username)
+# JOB SYSTEM
 
-        data = {
-            "username": profile.username,
-            "fullname": profile.full_name,
-            "followers": profile.followers,
-            "following": profile.followees,
-            "posts": profile.mediacount,
-            "bio": profile.biography,
-            "pfp": profile.profile_pic_url
-        }
-
-        return data
-
-    except Exception as e:
-        log(f"Profile info error: {e}")
-        return None
 # =========================
 # LOG FUNCTION
 # =========================
+def is_session_valid(sessionid):
+    try:
+        test_loader = instaloader.Instaloader()
+
+        test_loader.context._session.cookies.set(
+            "sessionid",
+            sessionid,
+            domain=".instagram.com"
+        )
+
+        # try to access own profile (light request)
+        profile = instaloader.Profile.from_username(
+            test_loader.context,
+            "instagram"
+        )
+
+        return True
+
+    except Exception as e:
+        log(f"Session invalid: {e}")
+        return False
+
 
 def log(msg):
     t = datetime.datetime.now().strftime("%H:%M:%S")
@@ -70,16 +75,35 @@ L = instaloader.Instaloader(
     save_metadata=False
 )
 
+if not is_session_valid(IG_SESSIONID):
+    print("❌ Developer session is INVALID")
+else:
+    print("✅ Developer session is VALID")
+
 L.context._session.cookies.set(
     "sessionid",
     IG_SESSIONID,
     domain=".instagram.com"
 )
-print("Instaloader session active")
 # =========================
 # START PLAYWRIGHT
 # =========================
+def update_playwright_session(context):
+    if context is None:
+        log("no context found")
+        bot.send_messaage(message.chat.id,"no context found")
+        return
 
+    context.clear_cookies()
+    context.add_cookies([{
+        "name": "sessionid",
+        "value": CURRENT_SESSION,
+        "domain": ".instagram.com",
+        "path": "/",
+        "httpOnly": True,
+        "secure": True,
+        "sameSite": "None"
+    }])
 print("Starting browser...")
 
 def get_profile_posts(username, limit=100):
@@ -166,9 +190,6 @@ def scrape_background(job, context):
         time.sleep(5)
 
         log(f"Current URL: {page.url}")
-        log(f"page title : {page.title}")
-        bot.send_message(job.chat_id,f"🌐 Page Title:\n{page.title}")
-        bot.send_message(job.chat_id,f"🔗 Current URL:\n{page.url}")
         if "challenge" in page.url:
             log("Instagram triggered a security challenge. Session is blocked.")
             page.close()
@@ -238,7 +259,7 @@ def scrape_background(job, context):
             pass
 
 def playwright_worker():
-
+    global PLAYWRIGHT_CONTEXT
     log("Starting browser in worker thread...")
 
     with sync_playwright() as play:
@@ -253,16 +274,8 @@ def playwright_worker():
         )
 
         context = browser.new_context()
-
-        context.add_cookies([{
-            "name": "sessionid",
-            "value": IG_SESSIONID,
-            "domain": ".instagram.com",
-            "path": "/",
-            "httpOnly": True,
-            "secure": True,
-            "sameSite": "None"
-        }])
+        PLAYWRIGHT_CONTEXT = context
+        update_playwright_session(context)
 
         page = context.new_page()
         page.goto("https://www.instagram.com/")
@@ -312,9 +325,8 @@ def start(message):
         "Send Instagram username"
     )
 class Job:
-    def __init__(self, username,chat_id):
+    def __init__(self, username):
         self.username = username
-        self.chat_id = chat_id
         self.posts = []
         self.sent = 0
         self.running = True
@@ -327,7 +339,48 @@ job_queue = Queue()
 @bot.message_handler(func=lambda m: True)
 def profile_handler(message):
 
-    username = extract_username(message.text)
+    global CURRENT_SESSION
+
+    # 🔴 if waiting for session input
+    if WAITING_SESSION.get(message.chat.id):
+
+        new_session = message.text.strip()
+
+        if is_session_valid(new_session):
+
+            CURRENT_SESSION = new_session
+
+            # update instaloader
+            L.context._session.cookies.set(
+                "sessionid",
+                CURRENT_SESSION,
+                domain=".instagram.com"
+            )
+
+            # update playwright session
+            update_playwright_session(PLAYWRIGHT_CONTEXT)
+
+            WAITING_SESSION[message.chat.id] = False
+
+            bot.send_message(message.chat.id, "✅ Session updated successfully!")
+
+        else:
+            bot.send_message(message.chat.id, "❌ Invalid session. Send again.")
+            return
+
+    # 🔴 check current session before proceeding
+    if WAITING_SESSION.get(message.chat.id):
+        pass
+    else:
+        # only check once per request
+        if not is_session_valid(CURRENT_SESSION):
+            WAITING_SESSION[message.chat.id] = True
+
+            bot.send_message(
+                message.chat.id,
+                "⚠️ Session expired.\n\nSend new sessionid to continue."
+            )
+            return
 
     if not username:
 
@@ -336,35 +389,6 @@ def profile_handler(message):
             "❌ Invalid input.\n\nSend:\n• Instagram username\n• Instagram profile link"
         )
         return
-
-    # get profile info first
-    info = get_profile_info(username)
-
-    if not info:
-        bot.send_message(message.chat.id, "❌ Could not load Instagram profile.")
-        return
-
-    caption = f"""
-    👤 Username: {info['username']}
-    📛 Name: {info['fullname']}
-
-    📊 Followers: {info['followers']}
-    📊 Following: {info['following']}
-    📸 Total Posts: {info['posts']}
-
-    📝 Bio:
-    {info['bio']}
-    """
-
-    # send profile picture
-    try:
-        bot.send_photo(
-            message.chat.id,
-            info["pfp"],
-            caption=caption
-        )
-    except:
-        bot.send_message(message.chat.id, caption)
 
     job = Job(username)
     user_jobs[message.chat.id] = job
