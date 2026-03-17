@@ -344,80 +344,117 @@ job_queue = Queue()
 def profile_handler(message):
 
     global CURRENT_SESSION, LAST_SESSION_CHECK
-    username = extract_username(message.text)
-    if not WAITING_SESSION.get(message.chat.id):
 
-        current_time = time.time()
-
-        if current_time - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
-
-            LAST_SESSION_CHECK = current_time
-
-            if not is_session_valid(CURRENT_SESSION):
-
-                WAITING_SESSION[message.chat.id] = True
-
-                bot.send_message(
-                    message.chat.id,
-                    "❌ Session expired.\nSend new sessionid."
-                )
-                return
-    # 🔴 check current session before proceeding
+    # =========================
+    # STEP 1: HANDLE SESSION INPUT
+    # =========================
     if WAITING_SESSION.get(message.chat.id):
-        pass
-    else:
-        # only check once per request
-        global LAST_SESSION_CHECK
 
-        current_time = time.time()
+        new_session = message.text.strip()
 
-        if current_time - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
+        if is_session_valid(new_session):
 
-            LAST_SESSION_CHECK = current_time
+            CURRENT_SESSION = new_session
 
-            if not is_session_valid(CURRENT_SESSION):
+            # update instaloader
+            L.context._session.cookies.set(
+                "sessionid",
+                CURRENT_SESSION,
+                domain=".instagram.com"
+            )
 
-                WAITING_SESSION[message.chat.id] = True
+            # update playwright
+            update_playwright_session(PLAYWRIGHT_CONTEXT)
 
-                bot.send_message(
-                    message.chat.id,
-                    "❌ Session expired.\nSend new sessionid."
-                )
-                return
+            WAITING_SESSION[message.chat.id] = False
+
+            bot.send_message(message.chat.id, "✅ Session updated successfully!")
+
+        else:
+            bot.send_message(message.chat.id, "❌ Invalid session. Send again.")
+            return
+
+        return  # IMPORTANT: stop here
+
+    # =========================
+    # STEP 2: CHECK SESSION (with cooldown)
+    # =========================
+    current_time = time.time()
+
+    if current_time - LAST_SESSION_CHECK > SESSION_CHECK_INTERVAL:
+
+        LAST_SESSION_CHECK = current_time
+
+        if not is_session_valid(CURRENT_SESSION):
+
+            WAITING_SESSION[message.chat.id] = True
+
+            bot.send_message(
+                message.chat.id,
+                "❌ Session expired.\nSend new sessionid."
+            )
+            return
+
+    # =========================
+    # STEP 3: NORMAL USER INPUT
+    # =========================
+    username = extract_username(message.text)
+
     if not username:
-
         bot.send_message(
             message.chat.id,
-            "❌ Invalid input.\n\nSend:\n• Instagram username\n• Instagram profile link"
+            "❌ Invalid input.\n\nSend username or profile link."
         )
         return
 
+    # =========================
+    # STEP 4: START JOB
+    # =========================
     job = Job(username)
     user_jobs[message.chat.id] = job
 
     bot.send_message(
         message.chat.id,
-        "Collecting posts from profile....\nPlease wait..."
+        "Collecting posts...\nPlease wait..."
     )
 
     job_queue.put(job)
 
-    # wait until scraper collects something
     wait_time = 0
     while len(job.posts) == 0 and wait_time < 40:
         time.sleep(2)
         wait_time += 2
 
+    # =========================
+    # STEP 5: FAILURE HANDLING
+    # =========================
     if len(job.posts) == 0:
 
+        # check session FIRST
+        if not is_session_valid(CURRENT_SESSION):
+
+            WAITING_SESSION[message.chat.id] = True
+
+            bot.send_message(
+                message.chat.id,
+                "❌ Session expired.\nSend new sessionid."
+            )
+            return
+
+        # otherwise restart system
         bot.send_message(
             message.chat.id,
-            "❌ Failed to collect posts.\nInstagram may have blocked the request."
+            "⚠️ System error. Restarting bot..."
         )
+
+        time.sleep(2)
+        restart_bot()
         return
 
+    # =========================
+    # STEP 6: SUCCESS
+    # =========================
     markup = InlineKeyboardMarkup()
-
     markup.add(
         InlineKeyboardButton("Download 10 Posts", callback_data="next"),
         InlineKeyboardButton("Cancel", callback_data="cancel")
@@ -425,7 +462,7 @@ def profile_handler(message):
 
     bot.send_message(
         message.chat.id,
-        f"✅ {len(job.posts)} posts ready.\nPress download.",
+        f"✅ {len(job.posts)} posts ready.",
         reply_markup=markup
     )
 # =========================
