@@ -33,7 +33,7 @@ CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}
 LAST_SESSION_CHECK = 0
 SESSION_CHECK_INTERVAL = 300  # 5 minutes
-global FAIL_COUNT
+
 # =========================
 # JOB SYSTEM
 import os
@@ -214,7 +214,7 @@ def scrape_background(job, context):
     username = job.username
     log(f"Scraping started for {username}")
     job.status = "opening_page"
-    debug(job.chat_id, f"[{job.username}] Opening page", True)
+    debug(job.chat_id, f"[{job.username}] Opening page")
 
     
 
@@ -232,8 +232,9 @@ def scrape_background(job, context):
         time.sleep(5)
         job.status = "loaded_page"
         log(f"Current URL: {page.url}")
-        log(f"page title : {page.title()}")
-        bot.send_message(job.chat_id,f"🌐 Page Title:\n{page.title()}")
+        title = page.title()
+        log(f"page title : {title}")
+        bot.send_message(job.chat_id,f"🌐 Page Title:\n{page.title}")
         bot.send_message(job.chat_id,f"🔗 Current URL:\n{page.url}")
         if "challenge" in page.url:
             job.status = "challenge"
@@ -242,7 +243,7 @@ def scrape_background(job, context):
             return
 
         if "accounts/login" in page.url:
-            job.status = "session_expierd"
+            job.status = "session_expired"
             debug(job.chat_id, f"[{job.username}]Session expired. Instagram requires login.")
             page.close()
             return
@@ -282,7 +283,8 @@ def scrape_background(job, context):
                     job.posts.append(link)
                     new_posts += 1
 
-            debug(job.chat_id, f"[{job.username}] posts: {len(job.posts)} (+{new_posts})")
+            if new_posts > 0:
+                debug(job.chat_id, f"[{job.username}] posts: {len(job.posts)} (+{new_posts})")
             log(f"posts: {len(job.posts)} (+{new_posts})")
 
             page.evaluate("""
@@ -487,13 +489,14 @@ def profile_handler(message):
     # =========================
     
     if len(job.posts) == 0:
-        global FAIL_COUNT 
-        if FAIL_COUNT >1:
+        global FAIL_COUNT
+        FAIL_COUNT += 1
+
+        if FAIL_COUNT >= 1:
             bot.send_message(
                 message.chat.id,
                 "⚠️ Critical error. Restarting bot..."
             )
-            FAIL_COUNT+=1
 
         time.sleep(2)
 
@@ -664,6 +667,8 @@ def send_next(call):
                 f"⚠️ Error processing post\n\nPost:\n{post_url}\n\nReason:\n{error_text}"
             )
             time.sleep(random.uniform(1.5, 3))
+
+           
 
     job.sent += len(posts)
 
