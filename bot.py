@@ -15,12 +15,14 @@ import instaloader
 # =========================
 # BOT TOKEN
 # =========================
-
+DEBUG_MESSAGES = {}
 TOKEN = "8665521420:AAHi0hfMNn3odVDCd9ajMCW_8FwrSz2OQLQ"
 bot = telebot.TeleBot(TOKEN, threaded=True)
 from queue import Queue
 
 job_queue = Queue()
+DEBUG = True
+ADMIN_ID = 123456789  # put your Telegram ID
 # =========================
 # INSTAGRAM SESSION
 # =========================
@@ -33,7 +35,13 @@ LAST_SESSION_CHECK = 0
 SESSION_CHECK_INTERVAL = 300  # 5 minutes
 # =========================
 # JOB SYSTEM
+import os
+import sys
 
+def restart_bot():
+    log("🔄 Restarting bot process...")
+    python = sys.executable
+    os.execl(python, python, *sys.argv)
 # =========================
 # LOG FUNCTION
 # =========================
@@ -66,9 +74,26 @@ def is_session_valid(sessionid):
     except Exception as e:
         log(f"Session check error: {e}")
         return False
-def log(msg):
-    t = datetime.datetime.now().strftime("%H:%M:%S")
-    print(f"[{t}] {msg}")
+def log(chat_id, text):
+
+    if not DEBUG:
+        return
+
+    # if message already exists → edit it
+    if chat_id in DEBUG_MESSAGES:
+        try:
+            bot.edit_message_text(
+                text,
+                chat_id,
+                DEBUG_MESSAGES[chat_id]
+            )
+            return
+        except:
+            pass
+
+    # otherwise send new
+    msg = bot.send_message(chat_id, text)
+    DEBUG_MESSAGES[chat_id] = msg.message_id
     
 # SESSION FUNCTION
 import os
@@ -183,6 +208,13 @@ def get_post_from_url(post_url):
 def scrape_background(job, context):
     username = job.username
     log(f"Scraping started for {username}")
+    job.status = "opening_page"
+    log(f"[{job.username}] Opening page", True)
+
+    page.goto(url, wait_until="domcontentloaded")
+
+    job.status = "loaded_page"
+    log(f"[{job.username}] Page loaded: {page.url}", True)
 
     try:
 
@@ -199,12 +231,14 @@ def scrape_background(job, context):
 
         log(f"Current URL: {page.url}")
         if "challenge" in page.url:
-            log("Instagram triggered a security challenge. Session is blocked.")
+            job.stauts = "challenge"
+            log(f"[{job.username}]Instagram triggered a security challenge. Session is blocked.")
             page.close()
             return
 
         if "accounts/login" in page.url:
-            log("Session expired. Instagram requires login.")
+            job.stauts = "session_expierd"
+            log(f"[{job.usernmae}]Session expired. Instagram requires login.")
             page.close()
             return
         # wait until page loads
@@ -344,17 +378,19 @@ def start(message):
         "Send Instagram username"
     )
 class Job:
-    def __init__(self, username):
+    def __init__(self, username, chat_id):
         self.username = username
+        self.chat_id = chat_id
         self.posts = []
         self.sent = 0
         self.running = True
+        self.status = "created"
 user_jobs ={}
 job_queue = Queue()
 # =========================
 # USERNAME HANDLER
 # =========================
-
+FAIL_COUNT = 0
 @bot.message_handler(func=lambda m: True)
 def profile_handler(message):
 
@@ -443,8 +479,19 @@ def profile_handler(message):
     # =========================
     # STEP 5: FAILURE HANDLING
     # =========================
+    
     if len(job.posts) == 0:
+        FAIL_COUNT +=1
+        if FAIL_COUNT >=1:
+            bot.send_message(
+                message.chat.id,
+                "⚠️ Critical error. Restarting bot..."
+            )
 
+        time.sleep(2)
+
+        restart_bot()
+    else:
         # check session FIRST
         if not is_session_valid(CURRENT_SESSION):
 
@@ -457,14 +504,15 @@ def profile_handler(message):
             return
 
         # otherwise restart system
-        bot.send_message(
-            message.chat.id,
-            "⚠️ System error. Restarting bot..."
-        )
+        # bot.send_message(
+        #     message.chat.id,
+        #     "⚠️ System error. Restarting bot..."
+        # )
 
-        time.sleep(2)
-        restart_bot()
-        return
+        # time.sleep(2)
+        
+        # restart_bot()
+        # return
 
     # =========================
     # STEP 6: SUCCESS
