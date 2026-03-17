@@ -24,8 +24,9 @@ job_queue = Queue()
 # =========================
 # INSTAGRAM SESSION
 # =========================
+control_queue = Queue()
 PLAYWRIGHT_CONTEXT = None
-IG_SESSIONID = "45575449095%3AUrvTric3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
+IG_SESSIONID = "45575449095%3AUrvTriciDLscrU%3A24%3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
 CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}
 LAST_SESSION_CHECK = 0
@@ -50,11 +51,14 @@ def is_session_valid(sessionid):
             "https://www.instagram.com/",
             headers=headers,
             cookies=cookies,
-            timeout=10
+            timeout=10,
+            allow_redirects=False  # 🔥 IMPORTANT
         )
-
         # if redirected to login → invalid
-        if "login" in r.url or r.status_code != 200:
+        if r.status_code in [301, 302]:
+            return False
+
+        if r.status_code != 200:
             return False
 
         return True
@@ -285,7 +289,20 @@ def playwright_worker():
         page.goto("https://www.instagram.com/")
 
         log("Instagram session activated")
+        while True:
 
+            # 🔴 check for control commands first
+            if not control_queue.empty():
+
+                cmd = control_queue.get()
+
+                if cmd == "update_session":
+                    log("🔄 Updating session in Playwright thread")
+                    update_playwright_session(context)
+
+                control_queue.task_done()
+
+            job = job_queue.get()
         while True:
 
             job = job_queue.get()
@@ -364,7 +381,7 @@ def profile_handler(message):
             )
 
             # update playwright
-            update_playwright_session(PLAYWRIGHT_CONTEXT)
+            control_queue.put("update_session")
 
             WAITING_SESSION[message.chat.id] = False
 
