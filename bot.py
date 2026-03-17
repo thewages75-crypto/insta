@@ -343,9 +343,8 @@ job_queue = Queue()
 @bot.message_handler(func=lambda m: True)
 def profile_handler(message):
 
-    global CURRENT_SESSION
-    global LAST_SESSION_CHECK
-
+    global CURRENT_SESSION, LAST_SESSION_CHECK
+    username = extract_username(message.text)
     if not WAITING_SESSION.get(message.chat.id):
 
         current_time = time.time()
@@ -385,7 +384,6 @@ def profile_handler(message):
                     "❌ Session expired.\nSend new sessionid."
                 )
                 return
-    username = extract_username(message.text)
     if not username:
 
         bot.send_message(
