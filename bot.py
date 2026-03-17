@@ -467,7 +467,7 @@ def profile_handler(message):
     # =========================
     # STEP 4: START JOB
     # =========================
-    job = Job(username, message.chat_id)
+    job = Job(username, message.chat.id)
     user_jobs[message.chat.id] = job
 
     bot.send_message(
