@@ -325,11 +325,11 @@ def scrape_background(job, context):
         log(f"Scraper error: {e}")
 
     finally:
+        job.finished = True   # ✅ IMPORTANT
         try:
             page.close()
         except:
             pass
-
 def playwright_worker():
     global PLAYWRIGHT_CONTEXT
     log("Starting browser in worker thread...")
@@ -415,6 +415,7 @@ class Job:
         self.sent = 0
         self.running = True
         self.status = "created"
+        self.finished = False   # ✅ ADD THIS
 user_jobs ={}
 job_queue = Queue()
 # =========================
@@ -502,7 +503,7 @@ def profile_handler(message):
     job_queue.put(job)
 
     wait_time = 0
-    while len(job.posts) == 0 and wait_time < 20:
+    while not job.finished and wait_time < 60:
         time.sleep(2)
         wait_time += 2
 
@@ -514,7 +515,7 @@ def profile_handler(message):
         global FAIL_COUNT
         FAIL_COUNT += 1
 
-        if FAIL_COUNT >= 1:
+        if FAIL_COUNT >= 2:
             bot.send_message(
                 message.chat.id,
                 "⚠️ Critical error. Restarting bot..."
