@@ -26,7 +26,7 @@ job_queue = Queue()
 # =========================
 control_queue = Queue()
 PLAYWRIGHT_CONTEXT = None
-IG_SESSIONID = "455LscrU%3A24%3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
+IG_SESSIONID = "45575449095%3AUrvTriciDLscrU%3A24%3AAYgshiZX6sRl6C2ExuxUpILUH2MRrq63Vb4I8_mMtw"
 CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}
 LAST_SESSION_CHECK = 0
@@ -41,6 +41,7 @@ def is_session_valid(sessionid):
     try:
         headers = {
             "User-Agent": "Mozilla/5.0",
+            "X-IG-App-ID": "936619743392459",  # important
         }
 
         cookies = {
@@ -48,20 +49,16 @@ def is_session_valid(sessionid):
         }
 
         r = requests.get(
-            "https://www.instagram.com/",
+            "https://i.instagram.com/api/v1/accounts/current_user/?",
             headers=headers,
             cookies=cookies,
-            timeout=10,
-            allow_redirects=False  # 🔥 IMPORTANT
+            timeout=10
         )
-        # if redirected to login → invalid
-        if r.status_code in [301, 302]:
-            return False
 
-        if r.status_code != 200:
-            return False
+        if r.status_code == 200 and "user" in r.text:
+            return True
 
-        return True
+        return False
 
     except Exception as e:
         log(f"Session check error: {e}")
