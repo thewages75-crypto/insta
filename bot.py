@@ -27,12 +27,42 @@ job_queue = Queue()
 # =========================
 LAST_SESSION_CHECK = 0
 SESSION_CHECK_INTERVAL = 300
-IG_SESSIONID = "45575449095%3APTeNL8atjcs9SbBQqnq2YL5l2j5od0mbvk8b74Q"
+IG_SESSIONID = "4555%3APTeNL8atjbF3Xs%3A9%3AAYgfcs9SbBQqnq2YL5l2j5od0mbvk8b74Q"
 CURRENT_SESSION = IG_SESSIONID
 WAITING_SESSION = {}   # chat_id → True/False
 control_queue = Queue()
 # =========================
 # JOB SYSTEM
+def progress_updater(job, chat_id):
+
+    last_count = -1   # 🔥 put here (outside loop)
+
+    while job.running:
+
+        try:
+            current = len(job.posts)
+
+            # 🔴 only update if changed
+            if current != last_count:
+
+                last_count = current
+
+                text = f"📊 Collected posts: {current}"
+
+                if job.progress_msg_id:
+                    bot.edit_message_text(
+                        text,
+                        chat_id,
+                        job.progress_msg_id
+                    )
+                else:
+                    msg = bot.send_message(chat_id, text)
+                    job.progress_msg_id = msg.message_id
+
+        except Exception as e:
+            log(f"Progress error: {e}")
+
+        time.sleep(10)
 def is_session_valid(sessionid):
     try:
         r = requests.get(
@@ -106,11 +136,15 @@ import sys
 def restart_bot(chat_id=None):
     try:
         if chat_id:
-            bot.send_message(chat_id, "🔄 Restarting bot... Please wait.")
+            bot.send_message(chat_id, "🔄 Restarting bot...")
     except:
         pass
 
-    log("🔄 Restarting process now...")
+    log("🔄 Restarting...")
+    bot.send_message(chat_id,"🔄 Restarting...")
+
+    # 🔥 STOP polling cleanly
+    bot.stop_polling()
 
     time.sleep(2)
 
@@ -386,6 +420,7 @@ class Job:
         self.posts = []
         self.sent = 0
         self.running = True
+        self.progress_msg_id = None   
 user_jobs ={}
 job_queue = Queue()
 # =========================
@@ -465,7 +500,11 @@ def profile_handler(message):
     # =========================
     job = Job(username)
     user_jobs[chat_id] = job
-
+    threading.Thread(
+        target=progress_updater,
+        args=(job, chat_id),
+        daemon=True
+    ).start()
     bot.send_message(
         chat_id,
         "Collecting posts...\nPlease wait..."
@@ -507,7 +546,7 @@ def profile_handler(message):
     # =========================
     # STEP 7: SUCCESS
     # =========================
-    
+    job.running = False
     markup = InlineKeyboardMarkup()
 
     markup.add(
@@ -523,7 +562,7 @@ def profile_handler(message):
 
     bot.send_message(
         chat_id,
-        f"✅ {len(job.posts)} posts ready.",
+        f"✅ {len(job.posts)} posts ready. click download button to download now",
         reply_markup=markup
     )
 # =========================
@@ -536,9 +575,9 @@ def cancel(call):
     job = user_jobs.get(call.message.chat.id)
 
     if job:
-        job.running = False
+        job.running = False   # 🔥 stops progress thread
 
-    bot.send_message(call.message.chat.id,"Scraping stopped.")
+    bot.send_message(call.message.chat.id, "Scraping stopped.")
 #=======================
 #CHECK SESSION
 #=======================
@@ -704,10 +743,11 @@ def send_next(call):
 # =========================
 print("Bot started")
 
-# start playwright worker
+bot.remove_webhook()   # 🔥 IMPORTANT
+
 threading.Thread(
     target=playwright_worker,
     daemon=True
 ).start()
 
-bot.infinity_polling()
+bot.infinity_polling(skip_pending=True)
